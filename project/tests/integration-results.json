@@ -1,0 +1,66 @@
+{
+  "scope": "Existing quote archive: import, preserve original values, correct extraction, search and view original",
+  "ok": true,
+  "tests_run": 11,
+  "failures": 0,
+  "errors": 0,
+  "duration_seconds": 7.8,
+  "isolation": "Temporary QUOTE_DATA_DIR and disposable SQLite; external AI disabled; originals read-only",
+  "tests": [
+    {
+      "test": "__main__.QuoteIntegration.test_01_real_documents_preserve_original_amounts_all_items_and_options",
+      "status": "passed",
+      "seconds": 0.312
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_02_source_files_are_linked_and_unmodified",
+      "status": "passed",
+      "seconds": 0.078
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_03_xlsx_docx_import_and_partial_failures",
+      "status": "passed",
+      "seconds": 0.188
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_04_local_korean_ocr_preserves_recognized_item_fields",
+      "status": "passed",
+      "seconds": 3.015
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_05_correction_does_not_reprice_or_overwrite_original_amounts",
+      "status": "passed",
+      "seconds": 0.032
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_06_explicit_contact_title_phone_item_and_period_filters",
+      "status": "passed",
+      "seconds": 0.062
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_07_compare_includes_pending_documents_components_and_all_options",
+      "status": "passed",
+      "seconds": 0.0
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_08_new_quote_copy_export_template_status_routes_are_disabled",
+      "status": "passed",
+      "seconds": 0.031
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_09_legacy_generated_rows_are_preserved_but_excluded_from_archive",
+      "status": "passed",
+      "seconds": 0.032
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_10_archive_stats_path_safety_and_restart_persistence",
+      "status": "passed",
+      "seconds": 1.093
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_11_legacy_source_migration_removes_inferred_tax_but_keeps_corrections",
+      "status": "passed",
+      "seconds": 1.61
+    }
+  ]
+}
