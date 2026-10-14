@@ -34,6 +34,21 @@ class QuoteIntegration(unittest.TestCase):
         cls.run_root.mkdir(exist_ok=True)
         cls.temporary = tempfile.TemporaryDirectory(prefix='archive-integration-', dir=cls.run_root)
         cls.work = Path(cls.temporary.name)
+        cls.samples=cls.work/'samples'
+        cls.samples.mkdir()
+        sources=list((ROOT/'data').glob('*.pdf'))+list((ROOT/'data').glob('*.xls'))
+        if not sources:
+            # The user may replace data/Input_data. Recover regression sources read-only
+            # from the already archived files, without restoring their working folders.
+            live_database=ROOT/'backend'/'storage'/'quotes.db'
+            with closing(sqlite3.connect(live_database.as_uri()+'?mode=ro',uri=True)) as connection:
+                for (payload,) in connection.execute('SELECT payload FROM quotes'):
+                    q=json.loads(payload);name=q.get('source_name','')
+                    if name.startswith(('18KJ_ACT','26KJ_POSCODX','26KJ_포스코디엑스')) and not q.get('parent_id'):
+                        source=live_database.parent/'files'/Path(q['source_url']).name
+                        if source.is_file():(cls.samples/name).write_bytes(source.read_bytes())
+        else:
+            for source in sources:(cls.samples/source.name).write_bytes(source.read_bytes())
         cls.token = uuid.uuid4().hex[:8]
         cls.counter = 0
         with socket.socket() as listener:
@@ -43,7 +58,7 @@ class QuoteIntegration(unittest.TestCase):
         cls.database = cls.work / 'storage' / 'quotes.db'
         env = os.environ.copy()
         env['QUOTE_DATA_DIR'] = str(cls.work / 'storage')
-        env['QUOTE_SAMPLE_DIR'] = str(ROOT / 'data')
+        env['QUOTE_SAMPLE_DIR'] = str(cls.samples)
         env['DATABASE_URL'] = 'sqlite:///' + cls.database.as_posix()
         env['EXTERNAL_AI_ENABLED'] = 'false'
         env.pop('OPENAI_API_KEY', None)
@@ -232,7 +247,7 @@ class QuoteIntegration(unittest.TestCase):
     def test_02_source_files_are_linked_and_unmodified(self):
         imported = self.api('POST', '/api/import-samples')
         for quote in imported['quotes']:
-            raw = (ROOT / 'data' / quote['source_name']).read_bytes()
+            raw = (self.samples / quote['source_name']).read_bytes()
             status, stored, _ = self.request('GET', quote['source_url'])
             self.assertEqual(status, 200)
             self.assertEqual(hashlib.sha256(raw).digest(), hashlib.sha256(stored).digest())
@@ -419,6 +434,212 @@ class QuoteIntegration(unittest.TestCase):
             source = entry['snapshot'].get('source_text', '')
             self.assertIsNone(re.search(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', source))
             self.assertIsNone(re.search(r'01[016789][- ]?\d{3,4}[- ]?\d{4}', source))
+
+
+    def test_12_full_source_content_extra_fields_and_search(self):
+        from openpyxl import load_workbook
+        from openpyxl.comments import Comment
+        book=load_workbook(self.xlsx)
+        book.active['B2']='FULL-CONTENT-'+self.token
+        sheet=book.create_sheet('추가 조건')
+        sheet['A1']='보증기간';sheet['B1']='무상 보증 3년 '+self.token
+        sheet['A2']='배송조건';sheet['B2']='지정 장소 반입 '+self.token
+        sheet['D7']='=1+2';sheet['D7'].comment=Comment('수식 검토 메모 '+self.token,'가상 담당')
+        sheet.row_dimensions[7].hidden=True
+        hidden=book.create_sheet('숨김 참고');hidden['C5']='내부 참고 '+self.token;hidden.sheet_state='hidden'
+        path=self.work/'full-content.xlsx';book.save(path)
+        quote=self.upload([path])['quotes'][0]
+        sheets={s['name']:s for s in quote['document_content']['sheets']}
+        cell=next(c for c in sheets['추가 조건']['cells'] if c['address']=='D7')
+        self.assertEqual(cell['formula'],'=1+2');self.assertIsNone(cell['value'])
+        self.assertTrue(cell['row_hidden']);self.assertIn('수식 검토 메모',cell['comment'])
+        self.assertEqual(sheets['숨김 참고']['state'],'hidden')
+        self.assertTrue(any('무상 보증 3년' in f['value'] for f in quote['extra_fields']))
+        self.assertIn(quote['id'],{q['id'] for q in self.api('GET','/api/quotes?'+urlencode({'query':'수식 검토 메모 '+self.token}))})
+        original_content=copy.deepcopy(quote['document_content'])
+        original_fields=copy.deepcopy(quote['original_extra_fields'])
+        quote['extra_fields'].append({'label':'특약','value':'검색 가능한 특약 '+self.token})
+        quote['document_content']={'text':'tampered'}
+        saved=self.api('PUT',f'/api/quotes/{quote["id"]}',quote)
+        self.assertEqual(saved['document_content'],original_content)
+        self.assertEqual(saved['original_extra_fields'],original_fields)
+        self.assertIn(saved['id'],{q['id'] for q in self.api('GET','/api/quotes?'+urlencode({'query':'검색 가능한 특약 '+self.token}))})
+        pdfs=[q for q in self.api('POST','/api/import-samples')['quotes'] if q['source_name'].endswith('.pdf')]
+        for pdf in pdfs:
+            self.assertTrue(pdf['document_content']['pages'])
+            for page in pdf['document_content']['pages']:
+                self.assertIn('tables',page);self.assertTrue(page['text'])
+        word=self.upload([self.docx])['quotes'][0]
+        self.assertTrue(any(b['kind']=='table' for b in word['document_content']['blocks']))
+
+    def test_13_trash_restore_preserves_original_and_excludes_all_active_views(self):
+        quote=self.confirm(self.new_archive())
+        before_stats=self.api('GET','/api/stats')
+        _,source_before,_=self.request('GET',quote['source_url'])
+        trashed=self.api('DELETE',f'/api/quotes/{quote["id"]}')
+        self.assertTrue(trashed['deleted_at'])
+        self.api('GET',f'/api/quotes/{quote["id"]}',expected=404)
+        self.assertNotIn(quote['id'],{q['id'] for q in self.api('GET','/api/quotes')})
+        self.assertNotIn(quote['id'],{r['quote_id'] for r in self.api('GET','/api/compare')})
+        self.assertEqual(self.api('GET','/api/stats')['quote_count'],before_stats['quote_count']-1)
+        self.assertIn(quote['id'],{q['id'] for q in self.api('GET','/api/trash')})
+        path=self.work/'duplicate-trashed.xlsx';path.write_bytes(source_before)
+        result=self.upload([path]);self.assertFalse(result['quotes']);self.assertIn('휴지통',result['errors'][0]['detail'])
+        restored=self.api('POST',f'/api/quotes/{quote["id"]}/restore')
+        for field in ('items','subtotal','tax','total','extra_fields','document_content','review_status','source_url'):
+            self.assertEqual(restored[field],quote[field])
+        self.assertFalse(restored.get('deleted_at'))
+        self.assertNotIn(quote['id'],{q['id'] for q in self.api('GET','/api/trash')})
+        self.assertIn(quote['id'],{q['id'] for q in self.api('GET','/api/quotes')})
+        _,source_after,_=self.request('GET',quote['source_url']);self.assertEqual(source_before,source_after)
+        history=self.api('GET',f'/api/quotes/{quote["id"]}/history')
+        self.assertTrue(any(h['snapshot'].get('deleted_at') for h in history))
+        self.assertEqual(self.api('GET','/api/stats')['quote_count'],before_stats['quote_count'])
+
+    def test_14_backfill_preserves_corrections_and_review_status(self):
+        quote=self.new_archive();quote['customer']='보강 전 정정 거래처';quote['items'][0]['specification']='정정한 규격'
+        quote=self.api('PUT',f'/api/quotes/{quote["id"]}',quote);quote=self.confirm(quote)
+        legacy=copy.deepcopy(quote)
+        for field in ('document_content','document_content_version','extra_fields','original_extra_fields'):legacy.pop(field,None)
+        with closing(sqlite3.connect(self.database)) as connection:
+            with connection:connection.execute('UPDATE quotes SET payload=? WHERE id=?',(json.dumps(legacy,ensure_ascii=False),quote['id']))
+        self.server.terminate();self.server.wait(timeout=10);type(self).server=self.start_server();self.wait_ready()
+        stored=self.api('GET',f'/api/quotes/{quote["id"]}')
+        self.assertEqual(stored['document_content_version'],1);self.assertTrue(stored['document_content']['sheets'])
+        for field in ('customer','items','total','subtotal','tax','review_status','acknowledged_warnings'):
+            self.assertEqual(stored[field],quote[field])
+        self.assertTrue(any(h['snapshot'].get('customer')=='보강 전 정정 거래처' for h in self.api('GET',f'/api/quotes/{quote["id"]}/history')))
+
+
+    def test_15_detailed_facts_are_structured_searchable_and_keep_provenance(self):
+        from openpyxl import load_workbook
+        book=load_workbook(self.xlsx);book.active['B2']='DETAILED-'+self.token
+        sheet=book.create_sheet('회사와 계약조건')
+        for row in [('공급사','가상 세부 공급사'),('사업자등록번호','TEST-REG-'+self.token),('보증기간','명시된 보증 24개월'),('배송조건','고객 지정 위치 반입'),('할인율','3%'),('특약','조건 '+self.token)]:sheet.append(row)
+        path=self.work/'detailed.xlsx';book.save(path)
+        quote=self.upload([path])['quotes'][0]
+        warranty=next(f for f in quote['detailed_fields'] if f['key']=='warranty')
+        self.assertEqual(warranty['value'],'명시된 보증 24개월')
+        self.assertEqual(warranty['source']['sheet'],'회사와 계약조건')
+        self.assertEqual(warranty['source']['cell'],'A3');self.assertEqual(warranty['source']['value_cell'],'B3')
+        original=copy.deepcopy(quote['original_detailed_fields'])
+        warranty['value']='검토 후 수정한 보증 '+self.token
+        warranty['source']={'page':999}
+        quote['items'][0]['specification']='-. CPU : Intel i7\n-. O/S : Windows 11 Pro\n-. 재질 : SUS304'
+        saved=self.api('PUT',f'/api/quotes/{quote["id"]}',quote)
+        corrected=next(f for f in saved['detailed_fields'] if f['id']==warranty['id'])
+        self.assertEqual(corrected['source']['cell'],'A3');self.assertEqual(corrected['origin'],'corrected')
+        self.assertEqual(saved['original_detailed_fields'],original)
+        attrs=saved['item_specifications'][0]['attributes']
+        self.assertIn(('O/S','Windows 11 Pro'),[(a['label'],a['value']) for a in attrs])
+        self.assertIn(saved['id'],{q['id'] for q in self.api('GET','/api/quotes?'+urlencode({'query':'검토 후 수정한 보증 '+self.token}))})
+        with closing(sqlite3.connect(self.database)) as connection:
+            facts=connection.execute('SELECT category,label,value,item_index,source FROM quote_facts WHERE quote_id=?',(saved['id'],)).fetchall()
+        self.assertEqual(len(facts),len(saved['detailed_fields'])+sum(len(it['attributes']) for it in saved['item_specifications']))
+        self.assertTrue(any(row[2]=='Windows 11 Pro' and row[3]==0 for row in facts))
+        self.assertTrue(any(row[2]=='검토 후 수정한 보증 '+self.token and json.loads(row[4]).get('cell')=='A3' for row in facts))
+        bad=copy.deepcopy(saved);bad['detailed_fields'][0]['value']=None
+        self.api('PUT',f'/api/quotes/{saved["id"]}',bad,expected=422)
+
+
+    def test_16_multiple_people_contacts_and_original_provenance(self):
+        from openpyxl import load_workbook
+        book=load_workbook(self.xlsx);book.active['B2']='PEOPLE-'+self.token
+        sheet=book.create_sheet('담당자 명단')
+        rows=[('담당자','가상김담당'),('소속회사','가상공급사'),('부서','영업1팀'),('직함','과장'),('전화','02-0000-0000'),('휴대전화','010-0000-0000'),('이메일','sales-'+self.token+'@example.invalid'),('팩스','02-0000-0001'),('주소','가상시 가상로 1'),('참조','가상이담당'),('소속회사','가상고객사'),('부서','구매팀'),('직함','대리'),('이메일','buyer-'+self.token+'@example.invalid')]
+        for row in rows:sheet.append(row)
+        hidden=book.create_sheet('숨김 인적 사항');hidden.sheet_state='hidden'
+        hidden.append(('담당자','가상숨김담당'));hidden.append(('이메일','hidden-person@example.invalid'))
+        path=self.work/'people.xlsx';book.save(path)
+        quote=self.upload([path])['quotes'][0]
+        person=next(p for p in quote['people_records'] if p['name']=='가상김담당')
+        for field,value in [('company','가상공급사'),('department','영업1팀'),('title','과장'),('mobile','010-0000-0000'),('fax','02-0000-0001')]:self.assertEqual(person[field],value)
+        self.assertTrue(any(p['name']=='가상이담당' and p['department']=='구매팀' for p in quote['people_records']))
+        self.assertTrue(any(p['name']=='가상숨김담당' and p['source_records'][0]['source']['hidden'] for p in quote['people_records']))
+        original=copy.deepcopy(quote['original_people_records']);evidence=copy.deepcopy(person['source_records'])
+        person['email']='corrected-'+self.token+'@example.invalid';person['source_records']=[]
+        saved=self.api('PUT',f'/api/quotes/{quote["id"]}',quote)
+        corrected=next(p for p in saved['people_records'] if p['id']==person['id'])
+        self.assertEqual(corrected['source_records'],evidence);self.assertEqual(saved['original_people_records'],original)
+        self.assertIn(saved['id'],{q['id'] for q in self.api('GET','/api/quotes?'+urlencode({'query':person['email']}))})
+        self.assertIn(saved['id'],{q['id'] for q in self.api('GET','/api/quotes?'+urlencode({'phone':'01000000000'}))})
+        with closing(sqlite3.connect(self.database)) as connection:
+            rows=connection.execute('SELECT name,department,email FROM quote_people WHERE quote_id=?',(saved['id'],)).fetchall()
+        self.assertIn(('가상김담당','영업1팀',person['email']),rows)
+
+    def test_17_people_pdf_uses_visible_render_not_covered_text(self):
+        from reportlab.pdfgen import canvas
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        pdfmetrics.registerFont(TTFont('PeopleTestKR','C:/Windows/Fonts/malgun.ttf'))
+        path=self.work/'people-masked.pdf';doc=canvas.Canvas(str(path),pagesize=(700,700));doc.setFont('PeopleTestKR',18)
+        doc.drawString(35,650,'견적번호 : MASK-'+self.token)
+        doc.drawString(35,610,'담당자 : 가상공개담당')
+        doc.drawString(35,570,'이메일 : visible-'+self.token+'@example.invalid')
+        doc.drawString(35,530,'전화 : 02-0000-0000')
+        hidden='hidden-'+self.token+'@example.invalid'
+        doc.drawString(35,450,'이메일 : '+hidden)
+        doc.setFillColorRGB(0,0,0);doc.rect(25,425,640,55,fill=1,stroke=0)
+        doc.showPage();doc.save()
+        quote=self.upload([path])['quotes'][0]
+        people_json=json.dumps(quote['people_records'],ensure_ascii=False)
+        evidence_json=json.dumps(quote['personal_source_blocks'],ensure_ascii=False)
+        self.assertNotIn(hidden,people_json);self.assertNotIn(hidden,evidence_json)
+        self.assertTrue(quote['personal_source_blocks'])
+        self.assertTrue(all(block['source'].get('method')=='visible-ocr' for block in quote['personal_source_blocks']))
+        self.assertTrue(any('가상공개담당' in p['name'].replace(' ','') for p in quote['people_records']),people_json+'\n'+json.dumps(quote.get('personal_visible_pages'),ensure_ascii=False))
+
+
+    def test_18_multiple_names_on_same_line_and_unassigned_contacts(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('people_capture_unit',ROOT/'backend'/'people_capture.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        people,evidence=module.parse_blocks([{'text':'전화:02-0000-0000\n담당자:가상김담당 이메일:supplier@example.invalid / 참조:가상이담당 이메일:buyer@example.invalid','source':{'page':1,'method':'visible-ocr'}}])
+        self.assertTrue(any(not p['name'] and p['phone']=='02-0000-0000' for p in people))
+        self.assertTrue(any(p['name']=='가상김담당' and 'supplier@example.invalid' in p['email'] for p in people))
+        self.assertTrue(any(p['name']=='가상이담당' and 'buyer@example.invalid' in p['email'] for p in people))
+        self.assertTrue(all(p['review_status']=='pending' for p in people))
+        rows,_=module.parse_blocks([{'text':'참조 허웅프로님 귀하 견적일자\n견적담당자 연 락 처 E - M AIL [PAYMENT]\n가상김이사 010-0000-0000','source':{'page':1}}])
+        self.assertTrue(any(p['name']=='허웅' and p['title']=='프로' for p in rows))
+        self.assertTrue(any(p['name']=='가상김' and p['title']=='이사' for p in rows))
+        self.assertFalse(any('연 락 처' in p['name'] for p in rows))
+
+
+    def test_19_category_lists_values_owners_search_and_trash(self):
+        quote=self.new_archive()
+        people=[{'id':uuid.uuid4().hex,'name':'가상카테고리담당','company':'가상카테고리회사','department':'구매팀','title':'과장','role':'고객 참조','phone':'02-0000-0011','mobile':'010-0000-0011','fax':'02-0000-0022','email':'category-'+self.token+'@example.invalid','address':'가상 주소'}]
+        quote['people_records']=people
+        quote['extra_fields'].append({'label':'FAX','value':'02-0000-0022 M : 010-0000-0011 MAIL : other@example.invalid'})
+        quote=self.api('PUT',f'/api/quotes/{quote["id"]}',quote)
+        catalog=self.api('GET','/api/categories')
+        self.assertIn('fax',{c['key'] for c in catalog})
+        result=self.api('GET','/api/categories/fax?'+urlencode({'query':'가상카테고리담당'}))
+        entries=[row for row in result['values'] if row['quote_id']==quote['id']]
+        named=[row for row in entries if row['person_name']=='가상카테고리담당']
+        self.assertEqual(len(named),1);self.assertEqual(named[0]['value'],'02-0000-0022')
+        self.assertTrue(all('MAIL' not in row['value'] and 'M :' not in row['value'] for row in entries))
+        self.assertEqual(entries[0]['person_name'],'가상카테고리담당')
+        numeric=self.api('GET','/api/categories/fax?query=0200000022')
+        self.assertIn(quote['id'],{r['quote_id'] for r in numeric['values']})
+        self.assertIn(quote['id'],{r['quote_id'] for r in self.api('GET','/api/categories/email')['values']})
+        self.api('GET','/api/categories/not-a-category',expected=404)
+        self.api('DELETE',f'/api/quotes/{quote["id"]}')
+        self.assertNotIn(quote['id'],{r['quote_id'] for r in self.api('GET','/api/categories/fax')['values']})
+        self.api('POST',f'/api/quotes/{quote["id"]}/restore')
+        self.assertIn(quote['id'],{r['quote_id'] for r in self.api('GET','/api/categories/fax')['values']})
+
+
+    def test_20_api_credentials_require_user_consent_and_never_enter_database(self):
+        body,content_type=self.multipart([(self.xlsx.name,self.xlsx.read_bytes())])
+        secret='FAKE_REQUEST_ONLY_TOKEN_12345'
+        request=Request(self.base+'/api/upload',data=body,method='POST',headers={'Content-Type':content_type,'X-User-API-Key':secret,'X-User-Agent-ID':'agt_mock0000'})
+        with self.assertRaises(HTTPError) as error:urlopen(request,timeout=10)
+        self.assertEqual(error.exception.code,422)
+        response=error.exception.read().decode();self.assertNotIn(secret,response)
+        with closing(sqlite3.connect(self.database)) as connection:
+            self.assertEqual(connection.execute('SELECT count(*) FROM quotes WHERE payload LIKE ?',('%'+secret+'%',)).fetchone()[0],0)
+            self.assertEqual(connection.execute('SELECT count(*) FROM quote_history WHERE snapshot LIKE ?',('%'+secret+'%',)).fetchone()[0],0)
+        self.assertFalse(self.api('GET','/api/health')['shared_api_key'])
 
 
 class RecordingResult(unittest.TextTestResult):

@@ -86,7 +86,8 @@ async function start() {
     if (!owned(info, service)) throw new Error('서버 실행 정보를 확인하지 못했습니다. .runtime 로그를 확인하세요.');
     record(name, info);
   }
-  for (let attempt = 0; attempt < 25; attempt++) {
+  // Initial source enrichment may render and recognize several PDF pages.
+  for (let attempt = 0; attempt < 120; attempt++) {
     const checks = await Promise.all([ready('backend'), ready('frontend')]);
     if (checks.every(Boolean)) {
       console.log('실행 완료: http://127.0.0.1:5173');

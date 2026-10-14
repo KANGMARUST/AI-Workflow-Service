@@ -1,46 +1,46 @@
 {
   "scope": "Existing quote archive: import, preserve original values, correct extraction, search and view original",
   "ok": true,
-  "tests_run": 11,
+  "tests_run": 20,
   "failures": 0,
   "errors": 0,
-  "duration_seconds": 7.8,
+  "duration_seconds": 44.23,
   "isolation": "Temporary QUOTE_DATA_DIR and disposable SQLite; external AI disabled; originals read-only",
   "tests": [
     {
       "test": "__main__.QuoteIntegration.test_01_real_documents_preserve_original_amounts_all_items_and_options",
       "status": "passed",
-      "seconds": 0.312
+      "seconds": 23.359
     },
     {
       "test": "__main__.QuoteIntegration.test_02_source_files_are_linked_and_unmodified",
       "status": "passed",
-      "seconds": 0.078
+      "seconds": 0.094
     },
     {
       "test": "__main__.QuoteIntegration.test_03_xlsx_docx_import_and_partial_failures",
       "status": "passed",
-      "seconds": 0.188
+      "seconds": 0.187
     },
     {
       "test": "__main__.QuoteIntegration.test_04_local_korean_ocr_preserves_recognized_item_fields",
       "status": "passed",
-      "seconds": 3.015
+      "seconds": 1.891
     },
     {
       "test": "__main__.QuoteIntegration.test_05_correction_does_not_reprice_or_overwrite_original_amounts",
       "status": "passed",
-      "seconds": 0.032
+      "seconds": 0.062
     },
     {
       "test": "__main__.QuoteIntegration.test_06_explicit_contact_title_phone_item_and_period_filters",
       "status": "passed",
-      "seconds": 0.062
+      "seconds": 0.156
     },
     {
       "test": "__main__.QuoteIntegration.test_07_compare_includes_pending_documents_components_and_all_options",
       "status": "passed",
-      "seconds": 0.0
+      "seconds": 0.032
     },
     {
       "test": "__main__.QuoteIntegration.test_08_new_quote_copy_export_template_status_routes_are_disabled",
@@ -50,17 +50,62 @@
     {
       "test": "__main__.QuoteIntegration.test_09_legacy_generated_rows_are_preserved_but_excluded_from_archive",
       "status": "passed",
-      "seconds": 0.032
+      "seconds": 0.078
     },
     {
       "test": "__main__.QuoteIntegration.test_10_archive_stats_path_safety_and_restart_persistence",
       "status": "passed",
-      "seconds": 1.093
+      "seconds": 1.141
     },
     {
       "test": "__main__.QuoteIntegration.test_11_legacy_source_migration_removes_inferred_tax_but_keeps_corrections",
       "status": "passed",
-      "seconds": 1.61
+      "seconds": 10.562
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_12_full_source_content_extra_fields_and_search",
+      "status": "passed",
+      "seconds": 0.11
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_13_trash_restore_preserves_original_and_excludes_all_active_views",
+      "status": "passed",
+      "seconds": 0.218
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_14_backfill_preserves_corrections_and_review_status",
+      "status": "passed",
+      "seconds": 1.157
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_15_detailed_facts_are_structured_searchable_and_keep_provenance",
+      "status": "passed",
+      "seconds": 0.109
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_16_multiple_people_contacts_and_original_provenance",
+      "status": "passed",
+      "seconds": 0.062
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_17_people_pdf_uses_visible_render_not_covered_text",
+      "status": "passed",
+      "seconds": 3.469
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_18_multiple_names_on_same_line_and_unassigned_contacts",
+      "status": "passed",
+      "seconds": 0.0
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_19_category_lists_values_owners_search_and_trash",
+      "status": "passed",
+      "seconds": 0.125
+    },
+    {
+      "test": "__main__.QuoteIntegration.test_20_api_credentials_require_user_consent_and_never_enter_database",
+      "status": "passed",
+      "seconds": 0.0
     }
   ]
 }

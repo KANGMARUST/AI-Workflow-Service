@@ -1,0 +1,10 @@
+# Local credentials and user source documents
+.env
+.env.*
+!.env.example
+SaveAPI.md
+**/SaveAPI.md
+Input_data/
+
+# project/.gitignore keeps dependencies, databases and local runtime files out.
+# Existing tracked files are preserved; these patterns apply to untracked files.

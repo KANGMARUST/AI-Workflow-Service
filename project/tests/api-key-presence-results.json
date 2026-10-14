@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-14",
+  "web": {
+    "key_input_empty": true,
+    "api_applied": false,
+    "local_analysis": true
+  },
+  "reference_key_found_in_memory": true,
+  "exact_personal_key_matches": [],
+  "key_pattern_candidates": [],
+  "files_checked": 85,
+  "db_and_backup_files_checked": [
+    ".backups/before-archive-scope.sqlite",
+    ".backups/before-detailed-facts-20261014-025959.sqlite",
+    ".backups/before-full-content-and-trash.sqlite",
+    ".backups/before-people-20261014-031048.sqlite",
+    "backend/storage/quotes.db",
+    "tests/.runs/tmp3fx3cvup/quotes.db",
+    "tests/.runs/tmp8d1k1asx/quotes.db",
+    "tests/.runs/tmpa_g50ju9/quotes.db"
+  ],
+  "env_credential_presence_in_audit_process": {
+    "UPSTAGE_API_KEY": false,
+    "OPENAI_API_KEY": false
+  },
+  "env_files": [
+    {
+      "path": "backend/.env.example",
+      "credential_variables": []
+    },
+    {
+      "path": "frontend/.env.example",
+      "credential_variables": []
+    }
+  ],
+  "code_checks": {
+    "frontend_default_key_empty": true,
+    "frontend_storage_api_reference": false,
+    "backend_key_from_request_header": true,
+    "backend_key_from_env_reference": false,
+    "live_test_imported_by_server": false
+  },
+  "errors": [],
+  "live_api_calls": 0,
+  "limitations": [
+    "Original quotation files, dependency packages and OCR models excluded; external Studio key list not inspected; running server process environment not directly inspected."
+  ]
+}

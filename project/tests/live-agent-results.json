@@ -1,0 +1,122 @@
+{
+  "ok": true,
+  "actual_api_calls": 4,
+  "expected_checks": 15,
+  "runs": [
+    {
+      "ok": true,
+      "elapsed_seconds": 20.97,
+      "result": {
+        "number": "TEST-T01-2026",
+        "customer": "가상한빛제조",
+        "issuer": "가상 테스트 공급사",
+        "issue_date": "2026-09-02",
+        "valid_until": "견적일로부터 30일",
+        "delivery": "발주 후 14일",
+        "ship_to": "",
+        "payment_terms": "검수 후 30일",
+        "project_name": "설비 개선 표준_부가세별도",
+        "currency": "KRW",
+        "tax_note": "VAT 별도",
+        "notes": "VAT 별도 / 세율 10% / 통화 KRW",
+        "items_json": "[{\"name\":\"센서 브라켓\",\"specification\":\"SUS304 / 100 X 80 mm\",\"unit\":\"EA\",\"quantity\":\"10\",\"unit_price\":\"12,000\",\"amount\":\"120,000\",\"is_component\":false,\"parent_index\":null,\"option_group\":null,\"original_text\":\"센서 브라켓 -. SUS304 / 100 X 80 mm\"},{\"name\":\"근접 센서\",\"specification\":\"DC24V / 감지 거리 8 mm\",\"unit\":\"EA\",\"quantity\":\"4\",\"unit_price\":\"45,000\",\"amount\":\"180,000\",\"is_component\":false,\"parent_index\":null,\"option_group\":null,\"original_text\":\"근접 센서 -. DC24V / 감지 거리 8 mm\"},{\"name\":\"설치 작업\",\"specification\":\"현장 설치 및 동작 점검\",\"unit\":\"식\",\"quantity\":\"1\",\"unit_price\":\"150,000\",\"amount\":\"150,000\",\"is_component\":false,\"parent_index\":null,\"option_group\":null,\"original_text\":\"설치 작업 -. 현장 설치 및 동작 점검\"}]",
+        "subtotal": 450000,
+        "tax": 45000,
+        "total": 495000,
+        "tax_rate": 10,
+        "source_total": 495000,
+        "source_total_kind": "total"
+      },
+      "metadata": {
+        "provider": "upstage",
+        "agent_id": "agt_WUmdoTPSummj3uQ7Qdi6dM",
+        "config_id": "1",
+        "response_id": "job_LvhnAh2uVdmXyhcyEKhWHW"
+      }
+    },
+    {
+      "ok": true,
+      "elapsed_seconds": 18.03,
+      "result": {
+        "number": "TEST-T02-2026",
+        "customer": "가상한빛제조",
+        "issuer": "가상 테스트 공급사",
+        "issue_date": "2026-10-01",
+        "valid_until": "견적일로부터 30일",
+        "delivery": "발주 후 14일",
+        "ship_to": "",
+        "payment_terms": "검수 후 30일",
+        "project_name": "설비 개선 동일품목_단가변경",
+        "currency": "KRW",
+        "tax_note": "VAT 별도",
+        "notes": "TEST ONLY / T02 / 1 / 1",
+        "items_json": "[{\"name\":\"센서 브라켓\",\"specification\":\"SUS304 / 100 X 80 mm\",\"unit\":\"EA\",\"quantity\":\"10\",\"unit_price\":\"13,500\",\"amount\":\"135,000\",\"is_component\":false,\"parent_index\":null,\"option_group\":null,\"original_text\":\"센서 브라켓 -. SUS304 / 100 X 80 mm\"},{\"name\":\"근접 센서\",\"specification\":\"DC24V / 감지 거리 8 mm\",\"unit\":\"EA\",\"quantity\":\"4\",\"unit_price\":\"47,000\",\"amount\":\"188,000\",\"is_component\":false,\"parent_index\":null,\"option_group\":null,\"original_text\":\"근접 센서 -. DC24V / 감지 거리 8 mm\"},{\"name\":\"설치 작업\",\"specification\":\"현장 설치 및 동작 점검\",\"unit\":\"식\",\"quantity\":\"1\",\"unit_price\":\"150,000\",\"amount\":\"150,000\",\"is_component\":false,\"parent_index\":null,\"option_group\":null,\"original_text\":\"설치 작업 -. 현장 설치 및 동작 점검\"}]",
+        "subtotal": 473000,
+        "tax": 47300,
+        "total": 520300,
+        "tax_rate": 10,
+        "source_total": 520300,
+        "source_total_kind": "total"
+      },
+      "metadata": {
+        "provider": "upstage",
+        "agent_id": "agt_WUmdoTPSummj3uQ7Qdi6dM",
+        "config_id": "1",
+        "response_id": "job_hhCnFPKKbwXVwMa9Cmmatp"
+      }
+    },
+    {
+      "ok": true,
+      "elapsed_seconds": 31.36,
+      "result": {
+        "summary": "견적번호 TEST-T01-2026의 공급사는 가상 테스트 공급사, 고객사는 가상한빛제조이며 발행일은 2026-09-02이다. 통화는 KRW이고 tax_note와 notes에 VAT 별도, 세율 10%가 기재되어 있다. 품목은 3개이며 소계 450000, 부가세 45000, 합계 495000, source_total 495000으로 표시되어 있다. 납기는 발주 후 14일, 대금조건은 검수 후 30일이다.",
+        "risk_level": "문제 없음",
+        "findings": [
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56 확인: subtotal 450000 + tax 45000 = total 495000이며 source_total 495000과 일치한다.",
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56, 품목 1 확인: \"센서 브라켓\" 수량 10, 단가 12000, 금액 120000, computed_amount 120000으로 표시되어 행 금액이 일치한다.",
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56, 품목 2 확인: \"근접 센서\" 수량 4, 단가 45000, 금액 180000, computed_amount 180000으로 표시되어 행 금액이 일치한다.",
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56, 품목 3 확인: \"설치 작업\" 수량 1, 단가 150000, 금액 150000, computed_amount 150000으로 표시되어 행 금액이 일치한다.",
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56 확인: tax_note에 \"VAT 별도\"가 있고 notes에 \"VAT 별도 / 세율 10% / 통화 KRW\"가 기재되어 있어 부가세가 별도 표시되며 tax 45000가 분리 표기되어 있다.",
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56 확인: 납기 \"발주 후 14일\", 대금조건 \"검수 후 30일\"이 기재되어 있다.",
+          "문서 ID 5a5767a6-8ad7-4124-9740-52ca5bf12f56 확인: 각 품목의 option_group이 모두 null로 표시되어 문서 데이터상 옵션 그룹 지정은 보이지 않는다."
+        ],
+        "recommendations": [
+          "원본에서 ship_to 항목이 비어 보이므로 실제 납품지가 별도 페이지나 원문에 있는지 확인하라.",
+          "원본에서 VAT 별도와 세율 10% 적용 기준이 최종 합계 495000에 어떻게 반영되었는지 tax_note, notes, tax 항목을 함께 확인하라.",
+          "원본에서 품목 3건 외에 부속 조건, 상세 규격, detailed_fields 또는 item_specifications에 해당하는 별첨이 없는지 확인하라."
+        ]
+      },
+      "metadata": {
+        "provider": "upstage",
+        "agent_id": "agt_3meY3NJetTYi7X9n8RTPpB",
+        "config_id": "1",
+        "response_id": "job_V5kZLoPQvxbXjQAoJcSwji"
+      }
+    },
+    {
+      "ok": true,
+      "elapsed_seconds": 37.26,
+      "result": {
+        "summary": "견적 TEST-T01-2026와 TEST-T02-2026는 동일 고객/공급사, 통화 KRW, VAT 별도, 납기 발주 후 14일, 지급조건 검수 후 30일로 비교 가능하다. 품목 구성과 수량은 동일하며, 차이는 프로젝트명과 일부 품목 단가·금액, 합계에 있다. 센서 브라켓 단가는 12,000에서 13,500으로, 근접 센서 단가는 45,000에서 47,000으로 변경되었고, 설치 작업은 동일하다. 이에 따라 subtotal은 450,000에서 473,000으로, tax는 45,000에서 47,300으로, total은 495,000에서 520,300으로 달라진다.",
+        "comparison_level": "비교 가능",
+        "differences": [
+          "문서 92b71843-d907-483a-b4ae-f668860ef12e 품목 '센서 브라켓'과 문서 017e7535-211d-4f42-8306-f064f3385f1f 품목 '센서 브라켓'은 사양 'SUS304 / 100 X 80 mm', 단위 'EA', 수량 10으로 동일하나, 단가는 각각 12000과 13500, 금액은 각각 120000과 135000으로 다르다.",
+          "문서 92b71843-d907-483a-b4ae-f668860ef12e 품목 '근접 센서'와 문서 017e7535-211d-4f42-8306-f064f3385f1f 품목 '근접 센서'는 사양 'DC24V / 감지 거리 8 mm', 단위 'EA', 수량 4로 동일하나, 단가는 각각 45000과 47000, 금액은 각각 180000과 188000으로 다르다.",
+          "문서 92b71843-d907-483a-b4ae-f668860ef12e 품목 '설치 작업'과 문서 017e7535-211d-4f42-8306-f064f3385f1f 품목 '설치 작업'은 사양 '현장 설치 및 동작 점검', 단위 '식', 수량 1, 단가 150000, 금액 150000으로 동일하다.",
+          "문서 92b71843-d907-483a-b4ae-f668860ef12e와 문서 017e7535-211d-4f42-8306-f064f3385f1f의 VAT 표기는 모두 'VAT 별도'로 동일하다. 다만 subtotal, tax, total은 각각 450000/45000/495000과 473000/47300/520300으로 다르다.",
+          "문서 92b71843-d907-483a-b4ae-f668860ef12e의 프로젝트명은 '설비 개선 표준_부가세별도'이고 문서 017e7535-211d-4f42-8306-f064f3385f1f의 프로젝트명은 '설비 개선 동일품목_단가변경'으로 다르다."
+        ],
+        "limitations": [
+          "source_name과 ship_to 값이 비어 있거나 누락되어 있어 해당 조건은 비교할 수 없다.",
+          "문서별 notes 값은 각각 'VAT 별도 / 세율 10% / 통화 KRW'와 'TEST ONLY / T02 / 1 / 1'로 형식과 의미가 달라 직접적인 조건 비교 근거로 보기 어렵다."
+        ]
+      },
+      "metadata": {
+        "provider": "upstage",
+        "agent_id": "agt_R5gPHUeVuUoDCheCftTnDL",
+        "config_id": "1",
+        "response_id": "job_fN6xhku4Nr5mbQAxZhjncG"
+      }
+    }
+  ]
+}

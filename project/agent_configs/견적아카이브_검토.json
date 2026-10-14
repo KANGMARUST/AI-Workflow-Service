@@ -1,0 +1,232 @@
+{
+  "kind": "studio.workflow-config-draft",
+  "schemaVersion": 4,
+  "exportedAt": "2026-10-14T03:38:50.001Z",
+  "exportedFrom": {
+    "workflowId": "agt_3meY3NJetTYi7X9n8RTPpB",
+    "workflowName": "견적아카이브_검토",
+    "configId": "cfg_bfcieqjaFyquF5VrCai7am",
+    "configVer": 1
+  },
+  "workflowConfig": {
+    "workflow_name": "견적아카이브_검토",
+    "pipelineType": "classify-extract",
+    "documentParseConfiguration": {
+      "modelName": "document-parse",
+      "mode": "standard",
+      "ocrMode": "force",
+      "lang": "",
+      "chartRecognition": false,
+      "coordinates": true,
+      "mergeMultipageTables": false,
+      "outputFormats": [
+        "html",
+        "text"
+      ],
+      "base64Encoding": [
+        "figure"
+      ]
+    },
+    "documentClassifyConfiguration": {
+      "modelName": "",
+      "schema": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "document-classify",
+          "schema": {
+            "type": "string",
+            "oneOf": [
+              {
+                "const": "확인 필요",
+                "description": "필수 정보 미기재, 원문 금액 모순 또는 비교 기준이 불명확하다"
+              },
+              {
+                "const": "주의",
+                "description": "옵션이나 VAT·거래 조건의 해석에 주의가 필요하다"
+              },
+              {
+                "const": "문제 없음",
+                "description": "입력에 명시된 항목과 금액에 확인 가능한 문제가 없다"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "informationExtractConfiguration": {
+      "modelName": "",
+      "schemas": [
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract_1",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "원본 견적 검토 요약. 원문 수치를 고치지 않는다"
+                },
+                "risk_level": {
+                  "type": "string",
+                  "description": "확인 필요 / 주의 / 문제 없음 중 분류"
+                },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "문서 ID와 품목 행 번호 및 원문 근거를 인용한 확인 사항. 누락, 합계 불일치, 옵션, VAT, 거래조건을 검토한다. 미기재를 사실로 단정하지 않는다"
+                  },
+                  "description": "findings"
+                },
+                "recommendations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "사용자가 원본에서 확인할 사항. 금액 수정이나 새 견적 작성은 하지 않는다"
+                  },
+                  "description": "recommendations"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        },
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract_2",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "원본 견적 검토 요약. 원문 수치를 고치지 않는다"
+                },
+                "risk_level": {
+                  "type": "string",
+                  "description": "확인 필요 / 주의 / 문제 없음 중 분류"
+                },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "문서 ID와 품목 행 번호 및 원문 근거를 인용한 확인 사항. 누락, 합계 불일치, 옵션, VAT, 거래조건을 검토한다. 미기재를 사실로 단정하지 않는다"
+                  },
+                  "description": "findings"
+                },
+                "recommendations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "사용자가 원본에서 확인할 사항. 금액 수정이나 새 견적 작성은 하지 않는다"
+                  },
+                  "description": "recommendations"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        },
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract_3",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "원본 견적 검토 요약. 원문 수치를 고치지 않는다"
+                },
+                "risk_level": {
+                  "type": "string",
+                  "description": "확인 필요 / 주의 / 문제 없음 중 분류"
+                },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "문서 ID와 품목 행 번호 및 원문 근거를 인용한 확인 사항. 누락, 합계 불일치, 옵션, VAT, 거래조건을 검토한다. 미기재를 사실로 단정하지 않는다"
+                  },
+                  "description": "findings"
+                },
+                "recommendations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "사용자가 원본에서 확인할 사항. 금액 수정이나 새 견적 작성은 하지 않는다"
+                  },
+                  "description": "recommendations"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        }
+      ],
+      "categorySchemaMapping": {
+        "확인 필요": "Extract_1",
+        "주의": "Extract_2",
+        "문제 없음": "Extract_3"
+      }
+    },
+    "pipelineEdges": [
+      {
+        "id": "e0",
+        "source": {
+          "nodeType": "parse"
+        },
+        "target": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        }
+      },
+      {
+        "id": "e1",
+        "source": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract_1"
+        },
+        "condition": {
+          "conditionName": "확인 필요"
+        }
+      },
+      {
+        "id": "e2",
+        "source": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract_2"
+        },
+        "condition": {
+          "conditionName": "주의"
+        }
+      },
+      {
+        "id": "e3",
+        "source": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract_3"
+        },
+        "condition": {
+          "conditionName": "문제 없음"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "kind": "studio.workflow-config-draft",
+  "schemaVersion": 4,
+  "exportedAt": "2026-10-14T03:41:09.722Z",
+  "exportedFrom": {
+    "workflowId": "agt_R5gPHUeVuUoDCheCftTnDL",
+    "workflowName": "견적아카이브_비교",
+    "configId": "cfg_iinyiqodfCRiBQFRs7u2jn",
+    "configVer": 1
+  },
+  "workflowConfig": {
+    "workflow_name": "견적아카이브_비교",
+    "pipelineType": "classify-extract",
+    "documentParseConfiguration": {
+      "modelName": "document-parse",
+      "mode": "standard",
+      "ocrMode": "force",
+      "lang": "",
+      "chartRecognition": false,
+      "coordinates": true,
+      "mergeMultipageTables": false,
+      "outputFormats": [
+        "html",
+        "text"
+      ],
+      "base64Encoding": [
+        "figure"
+      ]
+    },
+    "documentClassifyConfiguration": {
+      "modelName": "",
+      "schema": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "document-classify",
+          "schema": {
+            "type": "string",
+            "oneOf": [
+              {
+                "const": "비교 가능",
+                "description": "품목 규격·통화·VAT·수량 기준이 같아 직접 비교할 수 있다"
+              },
+              {
+                "const": "조건부 비교",
+                "description": "일부 품목은 비교 가능하나 옵션·규격·수량·VAT·통화·조건에 차이가 있다"
+              },
+              {
+                "const": "비교 불가",
+                "description": "같은 품목의 대응이나 원문 단가·비교 기준이 없다"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "informationExtractConfiguration": {
+      "modelName": "",
+      "schemas": [
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract_1",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "여러 기존 견적 차이 요약. 새로운 견적을 만들지 않는다"
+                },
+                "comparison_level": {
+                  "type": "string",
+                  "description": "비교 가능 / 조건부 비교 / 비교 불가"
+                },
+                "differences": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "선택한 원본 문서 ID 및 품목 행을 인용해 품목·사양·단가·VAT·조건 차이와 각각의 원문 값을 설명. 통화·수량·규격이 다르면 직접 가격 우열을 단정하지 않는다"
+                  },
+                  "description": "differences"
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "비교할 수 없는 부분과 이유. 빠진 값을 추정하지 않는다"
+                  },
+                  "description": "limitations"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        },
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract_2",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "여러 기존 견적 차이 요약. 새로운 견적을 만들지 않는다"
+                },
+                "comparison_level": {
+                  "type": "string",
+                  "description": "비교 가능 / 조건부 비교 / 비교 불가"
+                },
+                "differences": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "선택한 원본 문서 ID 및 품목 행을 인용해 품목·사양·단가·VAT·조건 차이와 각각의 원문 값을 설명. 통화·수량·규격이 다르면 직접 가격 우열을 단정하지 않는다"
+                  },
+                  "description": "differences"
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "비교할 수 없는 부분과 이유. 빠진 값을 추정하지 않는다"
+                  },
+                  "description": "limitations"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        },
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract_3",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "여러 기존 견적 차이 요약. 새로운 견적을 만들지 않는다"
+                },
+                "comparison_level": {
+                  "type": "string",
+                  "description": "비교 가능 / 조건부 비교 / 비교 불가"
+                },
+                "differences": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "선택한 원본 문서 ID 및 품목 행을 인용해 품목·사양·단가·VAT·조건 차이와 각각의 원문 값을 설명. 통화·수량·규격이 다르면 직접 가격 우열을 단정하지 않는다"
+                  },
+                  "description": "differences"
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "비교할 수 없는 부분과 이유. 빠진 값을 추정하지 않는다"
+                  },
+                  "description": "limitations"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        }
+      ],
+      "categorySchemaMapping": {
+        "비교 가능": "Extract_1",
+        "조건부 비교": "Extract_2",
+        "비교 불가": "Extract_3"
+      }
+    },
+    "pipelineEdges": [
+      {
+        "id": "e0",
+        "source": {
+          "nodeType": "parse"
+        },
+        "target": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        }
+      },
+      {
+        "id": "e1",
+        "source": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract_1"
+        },
+        "condition": {
+          "conditionName": "비교 가능"
+        }
+      },
+      {
+        "id": "e2",
+        "source": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract_2"
+        },
+        "condition": {
+          "conditionName": "조건부 비교"
+        }
+      },
+      {
+        "id": "e3",
+        "source": {
+          "nodeType": "classify",
+          "name": "Classify-1"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract_3"
+        },
+        "condition": {
+          "conditionName": "비교 불가"
+        }
+      }
+    ]
+  }
+}

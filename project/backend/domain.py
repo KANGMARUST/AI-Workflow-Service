@@ -3,7 +3,7 @@ import os,json,uuid,re
 from pathlib import Path
 from datetime import datetime,date
 from decimal import Decimal,InvalidOperation,ROUND_HALF_UP
-from sqlalchemy import create_engine,MetaData,Table,Column,String,Text,Integer,select
+from sqlalchemy import create_engine,MetaData,Table,Column,String,Text,Integer,select,delete
 from dotenv import load_dotenv
 BASE=Path(__file__).resolve().parent
 load_dotenv(BASE.parent/'.env');load_dotenv(BASE/'.env')
@@ -17,6 +17,8 @@ engine=create_engine(url,connect_args={'check_same_thread':False} if url.startsw
 meta=MetaData()
 quotes_table=Table('quotes',meta,Column('id',String(36),primary_key=True),Column('payload',Text,nullable=False),Column('file_hash',String(64),index=True))
 history_table=Table('quote_history',meta,Column('id',String(36),primary_key=True),Column('quote_id',String(36),index=True),Column('version',Integer),Column('changed_at',String(40)),Column('snapshot',Text))
+facts_table=Table('quote_facts',meta,Column('id',String(128),primary_key=True),Column('quote_id',String(36),index=True),Column('category',String(40),index=True),Column('field_key',String(80),index=True),Column('label',Text),Column('value',Text),Column('item_index',Integer),Column('source',Text),Column('original_text',Text),Column('origin',String(20)))
+people_table=Table('quote_people',meta,Column('id',String(128),primary_key=True),Column('quote_id',String(36),index=True),Column('name',Text,index=True),Column('company',Text),Column('department',Text),Column('title',Text),Column('role',Text),Column('phone',Text),Column('mobile',Text),Column('email',Text),Column('fax',Text),Column('address',Text),Column('payload',Text))
 meta.create_all(engine)
 def now():return datetime.now().astimezone().isoformat()
 def decimal(v):
@@ -74,20 +76,78 @@ def calculate(q):
     q.pop('discount',None);q.pop('tax_inferred',None);q.pop('status',None);q.pop('parent_id',None)
     return q
 
-def is_archive(row):
+def is_archive(row,include_deleted=False):
     if not row.file_hash:return False
     q=json.loads(row.payload)
+    if q.get('deleted_at') and not include_deleted:return False
     if q.get('parent_id'):return False
     filename=Path(q.get('source_url','')).name
     return bool(re.fullmatch(r'[a-f0-9]{64}\.(pdf|xls|xlsx|docx|png|jpe?g)',filename) and Path(filename).stem==row.file_hash and (STORAGE/'files'/filename).is_file())
 def all_quotes():
     with engine.connect() as c:return [json.loads(row.payload) for row in c.execute(select(quotes_table)).all() if is_archive(row)]
-def get_quote(id):
+
+def trashed_quotes():
+    with engine.connect() as c:
+        rows=c.execute(select(quotes_table)).all()
+    return sorted([json.loads(row.payload) for row in rows if is_archive(row,include_deleted=True) and json.loads(row.payload).get('deleted_at')],key=lambda q:q['deleted_at'],reverse=True)
+
+def backfill_document_content():
+    from document_capture import capture,VERSION
+    with engine.connect() as c:rows=c.execute(select(quotes_table)).all()
+    for row in rows:
+        if not is_archive(row,include_deleted=True):continue
+        previous=json.loads(row.payload)
+        if previous.get('document_content_version')==VERSION:continue
+        q=json.loads(row.payload)
+        try:
+            additions=capture(STORAGE/'files'/Path(q['source_url']).name,q.get('source_text',''))
+        except Exception as error:
+            # Retry on the next start. Preserve existing data if one source cannot be read.
+            import logging
+            logging.getLogger(__name__).warning('원문 구조 보강 실패 (%s): %s',q['id'],type(error).__name__)
+            continue
+        if q.get('extra_fields') is not None:additions.pop('extra_fields',None)
+        q.update(additions);q['version']=previous.get('version',1)+1
+        save(q,previous=previous)
+def get_quote(id,include_deleted=False):
     with engine.connect() as c:row=c.execute(select(quotes_table).where(quotes_table.c.id==id)).first()
-    return json.loads(row.payload) if row and is_archive(row) else None
+    return json.loads(row.payload) if row and is_archive(row,include_deleted) else None
+
+def backfill_details():
+    from quote_details import extract_details,VERSION
+    with engine.connect() as c:rows=c.execute(select(quotes_table)).all()
+    for row in rows:
+        if not is_archive(row,include_deleted=True):continue
+        previous=json.loads(row.payload)
+        if previous.get('details_version')==VERSION:continue
+        q=json.loads(row.payload);q.update(extract_details(q))
+        q.setdefault('original_detailed_fields',json.loads(json.dumps(q['detailed_fields'])))
+        q['version']=previous.get('version',1)+1;save(q,previous=previous)
+
+def backfill_people():
+    from people_capture import capture_people,VERSION
+    with engine.connect() as c:rows=c.execute(select(quotes_table)).all()
+    for row in rows:
+        if not is_archive(row,include_deleted=True):continue
+        previous=json.loads(row.payload)
+        if previous.get('people_version')==VERSION:continue
+        q=json.loads(row.payload)
+        try:
+            additions=capture_people(STORAGE/'files'/Path(q['source_url']).name,q)
+            preserved=[person for person in q.get('people_records',[]) if person.get('origin') in ('manual','corrected') or person.get('review_status')=='confirmed']
+            if preserved:
+                ids={p['id'] for p in preserved}
+                additions['people_records']=[p for p in additions['people_records'] if p['id'] not in ids]+preserved
+            q.update(additions)
+        except Exception as error:
+            import logging
+            logging.getLogger(__name__).warning('인적 사항 보강 실패 (%s): %s',q['id'],type(error).__name__)
+            continue
+        q.setdefault('original_people_records',json.loads(json.dumps(q['people_records'])))
+        q['version']=previous.get('version',1)+1;save(q,previous=previous)
 def duplicate(digest):
     with engine.connect() as c:row=c.execute(select(quotes_table).where(quotes_table.c.file_hash==digest)).first()
-    return json.loads(row.payload) if row and is_archive(row) else None
+    return json.loads(row.payload) if row and is_archive(row,include_deleted=True) else None
 def save(q,digest=None,previous=None):
     q['updated_at']=now()
     with engine.begin() as c:
@@ -95,6 +155,20 @@ def save(q,digest=None,previous=None):
             c.execute(history_table.insert().values(id=str(uuid.uuid4()),quote_id=q['id'],version=previous['version'],changed_at=q['updated_at'],snapshot=json.dumps(previous,ensure_ascii=False)))
             c.execute(quotes_table.update().where(quotes_table.c.id==q['id']).values(payload=json.dumps(q,ensure_ascii=False)))
         else:c.execute(quotes_table.insert().values(id=q['id'],payload=json.dumps(q,ensure_ascii=False),file_hash=digest))
+        c.execute(delete(facts_table).where(facts_table.c.quote_id==q['id']))
+        facts=[]
+        for index,field in enumerate(q.get('detailed_fields',[])):
+            facts.append(dict(id=q['id']+':field:'+str(index),quote_id=q['id'],category=field['category'],field_key=field['key'],label=field['label'],value=field['value'],item_index=None,source=json.dumps(field.get('source',{}),ensure_ascii=False),original_text=field.get('original_text',''),origin=field.get('origin','source')))
+        for it in q.get('item_specifications',[]):
+            for index,attr in enumerate(it['attributes']):
+                facts.append(dict(id=q['id']+':spec:'+str(it['item_index'])+':'+str(index),quote_id=q['id'],category='specification',field_key=attr['label'],label=attr['label'],value=attr['value'],item_index=it['item_index'],source=json.dumps(attr['source'],ensure_ascii=False),original_text=attr['original_text'],origin='registered'))
+        if facts:c.execute(facts_table.insert(),facts)
+        c.execute(delete(people_table).where(people_table.c.quote_id==q['id']))
+        people=[]
+        from people_capture import FIELDS
+        for person in q.get('people_records',[]):
+            people.append(dict(id=q['id']+':person:'+person['id'],quote_id=q['id'],payload=json.dumps(person,ensure_ascii=False),**{field:person.get(field,'') for field in FIELDS}))
+        if people:c.execute(people_table.insert(),people)
     return q
 
 def display_amount(q):return q.get('source_total') if q.get('source_total') is not None else q.get('total') if q.get('total') is not None else q.get('subtotal')
@@ -106,11 +180,13 @@ def filtered(filters):
         def match(q):
             if key=='contact':text=q.get('contact','')+' '+q.get('customer_contact','')
             elif key in ('customer','number'):text=q.get(key,'')
-            elif key=='phone':text=q.get('phone','')
+            elif key=='phone':text=q.get('phone','')+' '+' '.join(str(p.get(field,'') or '') for p in q.get('people_records',[]) for field in ('phone','mobile','fax'))
             elif key=='title':text=q.get('project_name','')
             elif key=='item':text=' '.join(x.get('name','')+' '+x.get('specification','') for x in q['items'])
             else:
-                text=' '.join(str(q.get(field) or '') for field in ('number','customer','contact','customer_contact','phone','email','issuer','project_name','source_name','source_text','notes'))+' '+' '.join(str(it.get(field) or '') for it in q['items'] for field in ('name','specification','unit','original_text'))
+                text=' '.join(str(q.get(field) or '') for field in ('number','customer','contact','customer_contact','phone','email','issuer','project_name','source_name','source_text','notes'))+' '+' '.join(str(it.get(field) or '') for it in q['items'] for field in ('name','specification','unit','original_text'))+' '+json.dumps(q.get('extra_fields',[]),ensure_ascii=False)+' '+q.get('document_content',{}).get('text','')+' '+json.dumps(q.get('detailed_fields',[]),ensure_ascii=False)
+            if key in ('query','contact'):
+                text+=' '+json.dumps(q.get('people_records',[]),ensure_ascii=False)+' '+json.dumps(q.get('personal_source_blocks',[]),ensure_ascii=False)
             if key=='phone':
                 digits=re.sub(r'\D','',value)
                 return bool(digits) and digits in re.sub(r'\D','',text)

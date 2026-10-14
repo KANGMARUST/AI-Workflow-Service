@@ -7,13 +7,13 @@ import domain as d
 ROW=re.compile(r'^(?:(\d+)\s+)?(.+?)\s+([\d,.]+)\s+([A-Za-z가-힣]+)\s+([\d,.]+)\s+([\d,.]+)(?:\s.*)?$')
 OCR_ENGINE=None
 
-def ocr(image):
+def ocr(image,upright=False):
     global OCR_ENGINE
     if OCR_ENGINE is None:
         from rapidocr_onnxruntime import RapidOCR
         model=Path(os.getenv('QUOTE_OCR_MODEL') or d.BASE/'models'/'korean_rec.onnx')
         OCR_ENGINE=RapidOCR(rec_model_path=str(model)) if model.is_file() else RapidOCR()
-    result,_=OCR_ENGINE(image)
+    result,_=OCR_ENGINE(image,use_cls=False if upright else None)
     grouped=[]
     for box,text,_confidence in sorted(result or [],key=lambda row:sum(point[1] for point in row[0])/4):
         cy=sum(point[1] for point in box)/4;cx=min(point[0] for point in box);height=max(point[1] for point in box)-min(point[1] for point in box)
@@ -170,25 +170,21 @@ def parse_sheets(sheets):
     generic['items']=items or parse_lines(text);generic['extraction_warnings']=extra
     return generic,text
 
-def external_structure(text):
-    if os.getenv('EXTERNAL_AI_ENABLED','false').lower()!='true' or not os.getenv('OPENAI_API_KEY'):return None
-    import httpx
-    prompt='이 견적 텍스트를 JSON object로 추출하세요. 필드 customer,issue_date,number,items(name,specification,unit,quantity,unit_price,amount,is_component,parent_index),source_total. 없는 값은 null. 반복 패키지는 한 번만 넣고 부품은 상위행 0 기반 인덱스 지정. 추측 금지.'
-    result=httpx.post(os.getenv('OPENAI_BASE_URL','https://api.openai.com/v1').rstrip('/')+'/chat/completions',headers={'Authorization':'Bearer '+os.environ['OPENAI_API_KEY']},json={'model':os.getenv('OPENAI_MODEL','gpt-4.1-mini'),'messages':[{'role':'system','content':prompt},{'role':'user','content':text}],'response_format':{'type':'json_object'}},timeout=60)
-    result.raise_for_status();return json.loads(result.json()['choices'][0]['message']['content'])
-
-def extract(path,allow_external=True):
-    suffix=path.suffix.lower();method='';extra=[]
+def extract(path,allow_external=True,agent_settings=None):
+    suffix=path.suffix.lower();method='';extra=[];pdf_pages=None
     if suffix in ('.xls','.xlsx'):
         q,text=read_spreadsheet(path);method='local-spreadsheet'
     elif suffix=='.pdf':
         import pdfplumber
-        parts=[];ocr_used=False
+        parts=[];ocr_used=False;pdf_pages=[]
         with pdfplumber.open(path) as book:
-            for page in book.pages:
+            for page_number,page in enumerate(book.pages,1):
                 text=page.extract_text() or ''
-                if len(text.strip())<30:text=ocr(page.to_image(resolution=180).original);ocr_used=True
+                page_method='text'
+                if len(text.strip())<30:text=ocr(page.to_image(resolution=180).original);ocr_used=True;page_method='ocr'
                 parts.append(text)
+                from document_capture import pdf_page
+                pdf_pages.append(pdf_page(page,page_number,text,page_method))
         text=sanitize_pdf('\n'.join(parts));q=header('\n'.join(parts));q['items']=parse_lines(text)
         q.update(contact='',phone='',email='')
         method='local-pdf+ocr' if ocr_used else 'local-pdf'
@@ -205,9 +201,21 @@ def extract(path,allow_external=True):
     elif suffix in ('.png','.jpg','.jpeg'):
         text=ocr(str(path));q=header(text);q['items']=parse_lines(text);method='local-ocr';extra.append('OCR 추출 결과를 원본 이미지와 비교해주세요.')
     else:raise ValueError('지원 파일: PDF, XLS, XLSX, DOCX, PNG, JPG')
-    remote=external_structure(text) if allow_external else None
-    if remote:q.update(remote);method+=' + external-ai'
+    if allow_external and agent_settings:
+        if suffix=='.pdf':
+            from user_agent import run_agent,merge_agent_result
+            remote,metadata=run_agent(path,agent_settings);merge_agent_result(q,remote)
+            q['agent_analysis']=metadata;method+=' + user-upstage-agent'
+        else:extra.append('사용자 에이전트 분석은 PDF에 적용됩니다. 이 파일은 로컬 분석으로 등록했습니다.')
     q.update(source_text=sanitize_pdf(text),extraction_method=method)
+    from document_capture import capture
+    q.update(capture(path,text if suffix!='.pdf' else sanitize_pdf(text),pdf_pages))
+    from quote_details import extract_details
+    q.update(extract_details(q))
+    q['original_detailed_fields']=json.loads(json.dumps(q['detailed_fields']))
+    from people_capture import capture_people
+    q.update(capture_people(path,q))
+    q['original_people_records']=json.loads(json.dumps(q['people_records']))
     q['source_snapshot_version']=2
     q['original_fields']=json.loads(json.dumps({key:q.get(key) for key in ('number','customer','contact','customer_contact','phone','email','project_name','issue_date','subtotal','tax','tax_rate','total','source_total','source_total_kind','tax_note','items')}))
     q['extraction_warnings']=(q.get('extraction_warnings') or [])+extra

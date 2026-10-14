@@ -1,0 +1,138 @@
+{
+  "kind": "studio.workflow-config-draft",
+  "schemaVersion": 4,
+  "exportedAt": "2026-10-14T03:35:04.485Z",
+  "exportedFrom": {
+    "workflowId": "agt_WUmdoTPSummj3uQ7Qdi6dM",
+    "workflowName": "견적아카이브_추출",
+    "configId": "cfg_K77gm6n4SDg8LSHNXgbtTe",
+    "configVer": 1
+  },
+  "workflowConfig": {
+    "workflow_name": "견적아카이브_추출",
+    "pipelineType": "extract",
+    "documentParseConfiguration": {
+      "modelName": "document-parse",
+      "mode": "standard",
+      "ocrMode": "force",
+      "lang": "",
+      "chartRecognition": false,
+      "coordinates": true,
+      "mergeMultipageTables": false,
+      "outputFormats": [
+        "html",
+        "text"
+      ],
+      "base64Encoding": [
+        "figure"
+      ]
+    },
+    "informationExtractConfiguration": {
+      "modelName": "",
+      "schemas": [
+        {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "Extract-1",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "string",
+                  "description": "원본 견적번호. 없으면 빈 문자열"
+                },
+                "customer": {
+                  "type": "string",
+                  "description": "수신 고객 회사명"
+                },
+                "issuer": {
+                  "type": "string",
+                  "description": "견적 발행 회사명"
+                },
+                "issue_date": {
+                  "type": "string",
+                  "description": "원본 작성일 YYYY-MM-DD"
+                },
+                "valid_until": {
+                  "type": "string",
+                  "description": "원본 유효기간"
+                },
+                "delivery": {
+                  "type": "string",
+                  "description": "명시된 납기"
+                },
+                "ship_to": {
+                  "type": "string",
+                  "description": "납품 장소"
+                },
+                "payment_terms": {
+                  "type": "string",
+                  "description": "원본 결제 조건"
+                },
+                "project_name": {
+                  "type": "string",
+                  "description": "원본 견적 제목"
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "원본 통화"
+                },
+                "tax_note": {
+                  "type": "string",
+                  "description": "명시된 VAT 조건. 미기재를 추정하지 않는다"
+                },
+                "notes": {
+                  "type": "string",
+                  "description": "모든 비고, 특약, 옵션 선택 조건을 원문 그대로 보존"
+                },
+                "items_json": {
+                  "type": "string",
+                  "description": "모든 품목을 순서대로 JSON 배열 문자열로 출력. 각 객체 name,specification,unit,quantity,unit_price,amount,is_component,parent_index,option_group,original_text. 숫자는 원문 숫자, 미기재는 null. 세부 부품과 모든 옵션도 누락하지 않는다. 합계 행은 제외. 새 가격이나 합계를 계산하지 않는다."
+                },
+                "subtotal": {
+                  "type": "number",
+                  "description": "원문에 직접 표시된 subtotal. 미기재면 null, 옵션 합계나 VAT를 추정/계산하지 않는다."
+                },
+                "tax": {
+                  "type": "number",
+                  "description": "원문에 직접 표시된 tax. 미기재면 null, 옵션 합계나 VAT를 추정/계산하지 않는다."
+                },
+                "total": {
+                  "type": "number",
+                  "description": "원문에 직접 표시된 total. 미기재면 null, 옵션 합계나 VAT를 추정/계산하지 않는다."
+                },
+                "tax_rate": {
+                  "type": "number",
+                  "description": "원문에 직접 표시된 tax_rate. 미기재면 null, 옵션 합계나 VAT를 추정/계산하지 않는다."
+                },
+                "source_total": {
+                  "type": "number",
+                  "description": "원문에 직접 표시된 source_total. 미기재면 null, 옵션 합계나 VAT를 추정/계산하지 않는다."
+                },
+                "source_total_kind": {
+                  "type": "string",
+                  "description": "원본 표시 합계 기준: subtotal 또는 total 또는 unknown"
+                }
+              }
+            }
+          },
+          "mode": "standard",
+          "modelName": ""
+        }
+      ],
+      "categorySchemaMapping": {}
+    },
+    "pipelineEdges": [
+      {
+        "id": "e0",
+        "source": {
+          "nodeType": "parse"
+        },
+        "target": {
+          "nodeType": "extract",
+          "name": "Extract-1"
+        }
+      }
+    ]
+  }
+}
