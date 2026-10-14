@@ -6,6 +6,7 @@ import httpx
 
 GUIDE_URL='https://ku-sejong-hackathon-playbook.vercel.app/'
 API_URL='https://api.upstage.ai/v2'
+FILE_TYPES={'.pdf':'application/pdf','.xls':'application/vnd.ms-excel','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'}
 
 
 @dataclass(frozen=True)
@@ -46,12 +47,14 @@ def scrub(value,secret):
 
 
 def run_agent(path,settings,transport=None,timeout=120):
+    content_type=FILE_TYPES.get(path.suffix.lower())
+    if not content_type:raise AgentError('지원하지 않는 원본 파일 형식입니다.')
     file_id=None
     try:
         with httpx.Client(base_url=API_URL,headers={'Authorization':'Bearer '+settings.api_key},timeout=30,follow_redirects=False,transport=transport) as client:
             try:
                 with path.open('rb') as file:
-                    uploaded=client.post('/files',data={'purpose':'user_data'},files={'file':('quotation.pdf',file,'application/pdf')})
+                    uploaded=client.post('/files',data={'purpose':'user_data'},files={'file':('quotation'+path.suffix.lower(),file,content_type)})
                 uploaded.raise_for_status();file_id=safe_id(uploaded.json().get('id'))
                 response=client.post('/responses',json={'model':settings.agent_id,'include':['last'],'input':[{'role':'user','content':[{'type':'input_file','file_id':file_id}]}],'config_id':settings.config_id})
                 response.raise_for_status();job=response.json();job_id=safe_id(job.get('id'))

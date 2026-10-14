@@ -61,6 +61,23 @@ class UserAgentTests(unittest.TestCase):
             with self.assertRaises(AgentError) as error:run_agent(path,AgentSettings(key,'agt_test0000'),transport=transport)
             self.assertNotIn(key,str(error.exception));self.assertIn('인증',str(error.exception))
 
+    def test_original_file_types_are_uploaded_with_matching_names_and_content_types(self):
+        types={'.pdf':'application/pdf','.xls':'application/vnd.ms-excel','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'}
+        with self.temporary() as temp:
+            for extension,mime in types.items():
+                path=Path(temp)/('virtual'+extension);path.write_bytes(b'virtual document')
+                def handle(request):
+                    if request.url.path=='/v2/files' and request.method=='POST':
+                        body=request.content
+                        self.assertIn(('filename="quotation'+extension+'"').encode(),body)
+                        self.assertIn(('Content-Type: '+mime).encode(),body)
+                        return httpx.Response(200,json={'id':'file_mock'})
+                    if request.url.path=='/v2/responses':return httpx.Response(200,json={'id':'job_mock','status':'completed','output_text':'{"customer":"가상 고객"}'})
+                    if request.method=='DELETE':return httpx.Response(200,json={'deleted':True})
+                    self.fail('unexpected request')
+                result,_=run_agent(path,AgentSettings('FAKE_TEST_KEY','agt_test0000'),transport=httpx.MockTransport(handle))
+                self.assertEqual(result['customer'],'가상 고객')
+
     def test_polling_and_timeout_cleanup(self):
         with self.temporary() as temp:
             path=Path(temp)/'test.pdf';path.write_bytes(b'%PDF fake');seen=[]

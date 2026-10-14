@@ -102,4 +102,4 @@ API 키는 현재 탭 메모리와 해당 분석 요청에서만 사용합니다
 
 ## Studio 에이전트 작업실
 
-기본 화면에서 원본 PDF 재추출, 저장 견적 검토, 문서 2~5개 비교를 실행합니다. API 설정에서 본인 Upstage 키와 동의를 적용하고 작업실에서 역할별 Agent ID/Config ID를 확인하세요. 실제 생성 설정은 agent_configs, 활용·API 호출·테스트 기록은 docs/AGENT_WORKFLOW.md에 있습니다. 분석 결과는 별도 보고서이며 원본 금액을 자동 변경하지 않습니다. 다른 계정은 자신이 접근 가능한 Studio Agent ID로 바꿔야 합니다. 사용법: https://ku-sejong-hackathon-playbook.vercel.app/#sec5
+기본 화면에서 PDF·Excel(.xls/.xlsx)·Word(.docx)·이미지(.png/.jpg/.jpeg) 원본 재추출과 저장 견적의 누락·금액·조건 검토를 각각 1~5개씩 실행하거나, 문서 2~5개를 함께 비교합니다. 작업실에서 여러 파일을 등록하면 로컬 분석으로 보관함에 저장되고 처음 5개가 선택됩니다. Studio 전송은 실행 버튼을 누를 때 시작하며, 재추출·검토 결과는 문서별 보고서로 저장됩니다. API 설정에서 본인 Upstage 키와 동의를 적용하고 작업실에서 역할별 Agent ID/Config ID를 확인하세요. 실제 생성 설정은 agent_configs, 활용·API 호출·테스트 기록은 docs/AGENT_WORKFLOW.md에 있습니다. 분석 결과는 별도 보고서이며 원본 금액을 자동 변경하지 않습니다. 다른 계정은 자신이 접근 가능한 Studio Agent ID로 바꿔야 합니다. 사용법: https://ku-sejong-hackathon-playbook.vercel.app/#sec5

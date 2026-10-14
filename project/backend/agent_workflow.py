@@ -1,5 +1,5 @@
 """Studio analysis reports, separate from original quotation records."""
-import json,uuid,tempfile
+import json,re,uuid,tempfile
 from pathlib import Path
 from xml.sax.saxutils import escape
 from sqlalchemy import Table,Column,String,Text,select
@@ -48,8 +48,10 @@ def execute(kind,quotes,settings,runner=run_agent):
         with tempfile.TemporaryDirectory(prefix='quote-agent-',dir=d.STORAGE) as directory:
             path=Path(directory)/'analysis.pdf'
             if kind=='extract':
-                original=d.STORAGE/'files'/Path(quotes[0]['source_url']).name
-                if original.suffix.lower()!='.pdf':raise AgentError('원본 재추출은 PDF 문서에서 사용할 수 있습니다. 다른 형식은 검토·비교를 사용해주세요.')
+                filename=Path(quotes[0].get('source_url') or '').name
+                if not re.fullmatch(r'[a-f0-9]{64}\.(pdf|xls|xlsx|docx|png|jpe?g)',filename):raise AgentError('지원하는 원본 파일이 연결되지 않았습니다.')
+                original=d.STORAGE/'files'/filename
+                if not original.is_file():raise AgentError('원본 파일을 찾지 못했습니다.')
                 path=original
             else:build_input(path,quotes,kind)
             result,metadata=runner(path,settings)

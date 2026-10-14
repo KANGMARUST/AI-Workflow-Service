@@ -2,8 +2,8 @@ import React from 'react';
 
 export const STUDIO_AGENTS={extract:'agt_WUmdoTPSummj3uQ7Qdi6dM',review:'agt_3meY3NJetTYi7X9n8RTPpB',compare:'agt_R5gPHUeVuUoDCheCftTnDL'};
 export const AGENT_ROLES={
- extract:{name:'견적아카이브_추출',purpose:'원본 PDF의 거래처·품목·단가·금액을 추출합니다.',location:'API 설정의 Agent ID / 작업실의 원본 재추출'},
- review:{name:'견적아카이브_검토',purpose:'저장된 견적 1건의 누락·금액 불일치·조건을 검토합니다.',location:'작업실 → 누락·금액·조건 검토 → Agent ID'},
+ extract:{name:'견적아카이브_추출',purpose:'기존 견적 원본(PDF·Excel·Word·이미지)의 거래처·품목·단가·금액을 추출합니다.',location:'API 설정의 Agent ID / 작업실의 원본 재추출'},
+ review:{name:'견적아카이브_검토',purpose:'저장된 견적 1~5건의 누락·금액 불일치·조건을 문서별로 검토합니다.',location:'작업실 → 누락·금액·조건 검토 → Agent ID'},
  compare:{name:'견적아카이브_비교',purpose:'저장된 견적 2~5건의 품목·단가·조건 차이를 비교합니다.',location:'작업실 → 여러 견적 비교 → Agent ID'},
 };
 
