@@ -168,9 +168,24 @@ def category_values(key:str,query:str=''):
         values=[row for row in values if needle in ' '.join(str(row.get(field) or '') for field in ('value','person_name','person_role','customer','quote_title','source_name')).casefold() or (key in ('fax','phone','mobile') and needle.isdigit() and needle in re.sub(r'\D','',row['value']))]
     return dict(category=category,values=values,count=len(values))
 @app.post('/api/natural-search')
-def natural(payload:dict=Body(...)):
+def natural(request:Request,payload:dict=Body(...)):
     question=str(payload.get('question','')).strip()
     if not question:raise HTTPException(422,'검색할 질문을 입력해주세요.')
+    if len(question)>1000:raise HTTPException(422,'질문은 1000자 이내로 입력해주세요.')
+    from user_agent import settings_from_request
+    settings=settings_from_request(request)
+    if settings:
+        from natural_answer import CHAT_MODELS, MODEL, answer_with_api
+        model=payload.get('model',MODEL)
+        if not isinstance(model,str) or model not in CHAT_MODELS:
+            raise HTTPException(422,'지원하지 않는 Solar Chat 모델입니다.')
+        history=payload.get('history',[])
+        if not isinstance(history,list) or len(history)>12 or any(
+            not isinstance(turn,dict) or turn.get('role') not in ('user','assistant') or
+            not isinstance(turn.get('content'),str) or len(turn['content'])>2000
+            for turn in history):
+            raise HTTPException(422,'이전 대화 형식을 확인해주세요.')
+        return answer_with_api(question,d.all_quotes(),settings.api_key,history=history[-8:],model=model)
     filters={}
     stopwords={'견적','견적서','건','품목','품목명','프로젝트','제목','담당자','내역','조회','검색','전체'}
     if re.search(r'검토\s*필요|미확정|검토\s*대기',question):filters['review_status']='pending'
