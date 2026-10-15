@@ -1,10 +1,10 @@
 """Authorized developer test only. Never imported by the web server."""
-import json,re,sys,time
+import json,os,re,sys,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'backend/.packages'));sys.path.insert(0,str(ROOT/'backend'))
 from user_agent import AgentSettings,run_agent,AgentError
-KEY_FILE=ROOT.parent/'SaveAPI.md'
+KEY_FILE=Path(os.getenv('QUOTE_TEST_KEY_FILE') or ROOT.parent/'SaveAPI.md')
 def test_key():
     text=KEY_FILE.read_text(encoding='utf-8-sig')
     matches=re.findall(r'\bup_[A-Za-z0-9_-]{16,}\b',text)

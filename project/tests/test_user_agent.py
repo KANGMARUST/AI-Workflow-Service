@@ -93,6 +93,26 @@ class UserAgentTests(unittest.TestCase):
             with self.assertRaises(AgentError):run_agent(path,AgentSettings('FAKE_USER_TOKEN','agt_test0000'),transport=httpx.MockTransport(handle),timeout=-1)
             self.assertIn(('DELETE','/v2/files/file_poll'),seen)
 
+    def test_two_input_files_are_sent_together_and_cleaned(self):
+        with self.temporary() as temp:
+            paths=[Path(temp)/'original.pdf',Path(temp)/'extracted.pdf']
+            for path in paths:path.write_bytes(b'%PDF invented')
+            uploads=[];deleted=[]
+            def handle(request):
+                if request.url.path=='/v2/files' and request.method=='POST':
+                    ident='file_'+str(len(uploads)+1);uploads.append(ident)
+                    self.assertIn(('quotation-'+str(len(uploads))+'.pdf').encode(),request.content)
+                    return httpx.Response(200,json={'id':ident})
+                if request.url.path=='/v2/responses':
+                    body=json.loads(request.content)
+                    self.assertEqual(body['input'][0]['content'],[{'type':'input_file','file_id':ident} for ident in uploads])
+                    return httpx.Response(200,json={'id':'response_mock','status':'completed','output_text':'{"summary":"가상 결과"}'})
+                if request.method=='DELETE':deleted.append(request.url.path);return httpx.Response(200,json={})
+                self.fail('unexpected request')
+            result,_=run_agent(paths,AgentSettings('FAKE_USER_TOKEN','agt_test0000'),transport=httpx.MockTransport(handle))
+            self.assertEqual(result['summary'],'가상 결과')
+            self.assertEqual(deleted,['/v2/files/file_1','/v2/files/file_2'])
+
 
 if __name__=='__main__':
     result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(UserAgentTests))

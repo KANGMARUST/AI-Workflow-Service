@@ -3,7 +3,7 @@ import os,uuid,json,re,hashlib,importlib.util
 from pathlib import Path
 from datetime import date
 from collections import defaultdict
-from fastapi import FastAPI,HTTPException,UploadFile,File,Body,Request
+from fastapi import FastAPI,HTTPException,UploadFile,File,Body,Request,BackgroundTasks
 from fastapi.responses import FileResponse,JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
@@ -28,6 +28,35 @@ def require(id):
 def agent_runs():
     from agent_workflow import list_runs
     return list_runs()
+
+@app.get('/api/analysis-flows')
+def analysis_flows():
+    from submission_workflow import recent
+    return recent()
+
+@app.get('/api/analysis-flows/{id}')
+def analysis_flow(id:str):
+    from submission_workflow import get
+    record=get(id)
+    if record is None:raise HTTPException(404,'분석 기록을 찾지 못했습니다.')
+    return record
+
+@app.post('/api/analysis-flows')
+def start_analysis_flow(request:Request,background_tasks:BackgroundTasks,payload:dict=Body(...)):
+    from user_agent import settings_from_request,AgentError
+    from submission_workflow import start,run
+    settings=settings_from_request(request)
+    if settings is None:raise AgentError('API 설정에서 본인 키와 외부 전송 동의를 먼저 적용해주세요.')
+    ids=payload.get('quote_ids')
+    if not isinstance(ids,list) or not ids or len(ids)>5 or any(not isinstance(i,str) for i in ids):
+        raise AgentError('현재 문서와 비교 문서 최대 4개를 선택해주세요.')
+    agents=payload.get('agents')
+    if not isinstance(agents,dict) or not isinstance(agents.get('extract'),dict) or agents['extract'].get('agent_id')!=settings.agent_id or str(agents['extract'].get('config_id'))!=settings.config_id:
+        raise AgentError('API 설정의 추출 에이전트와 실행 연결을 일치시켜주세요.')
+    quotes=[require(ident) for ident in ids]
+    record=start(quotes,agents)
+    background_tasks.add_task(run,record['id'],quotes,settings.api_key)
+    return record
 
 @app.post('/api/agent-runs')
 def agent_run(request:Request,payload:dict=Body(...)):
@@ -56,6 +85,19 @@ def health():return dict(ok=True,mode='archive',extraction_mode='local-parser + 
 def quotes(query:str='',customer:str='',contact:str='',phone:str='',title:str='',number:str='',item:str='',date_from:str='',date_to:str='',min_amount:float|None=None,max_amount:float|None=None,review_status:str=''):return d.filtered(locals())
 @app.get('/api/quotes/{id}')
 def get(id:str):return require(id)
+@app.get('/api/quotes/{id}/similar')
+def similar(id:str):
+    from quote_similarity import recommend
+    return recommend(require(id),d.all_quotes())
+@app.get('/api/quotes/{id}/compare/{other_id}')
+def compare_saved(id:str,other_id:str,matches:str=''):
+    from quote_similarity import compare_pair
+    if id==other_id:raise HTTPException(422,'서로 다른 문서를 선택해주세요.')
+    selected={}
+    if matches:
+        if len(matches)>300 or not re.fullmatch(r'\d+:\d+(,\d+:\d+)*',matches):raise HTTPException(422,'품목 대응 선택을 확인해주세요.')
+        selected={int(pair.split(':')[0]):int(pair.split(':')[1]) for pair in matches.split(',')}
+    return compare_pair(require(id),require(other_id),selected)
 @app.put('/api/quotes/{id}')
 def update(id:str,payload:dict=Body(...)):
     previous=require(id);q=json.loads(json.dumps(previous))

@@ -47,16 +47,19 @@ def scrub(value,secret):
 
 
 def run_agent(path,settings,transport=None,timeout=120):
-    content_type=FILE_TYPES.get(path.suffix.lower())
-    if not content_type:raise AgentError('지원하지 않는 원본 파일 형식입니다.')
-    file_id=None
+    paths=list(path) if isinstance(path,(list,tuple)) else [path]
+    if not paths or len(paths)>5:raise AgentError('에이전트 입력 파일은 1~5개여야 합니다.')
+    if any(FILE_TYPES.get(p.suffix.lower()) is None for p in paths):raise AgentError('지원하지 않는 원본 파일 형식입니다.')
+    file_ids=[]
     try:
         with httpx.Client(base_url=API_URL,headers={'Authorization':'Bearer '+settings.api_key},timeout=30,follow_redirects=False,transport=transport) as client:
             try:
-                with path.open('rb') as file:
-                    uploaded=client.post('/files',data={'purpose':'user_data'},files={'file':('quotation'+path.suffix.lower(),file,content_type)})
-                uploaded.raise_for_status();file_id=safe_id(uploaded.json().get('id'))
-                response=client.post('/responses',json={'model':settings.agent_id,'include':['last'],'input':[{'role':'user','content':[{'type':'input_file','file_id':file_id}]}],'config_id':settings.config_id})
+                for index,p in enumerate(paths):
+                    with p.open('rb') as file:
+                        name='quotation'+p.suffix.lower() if len(paths)==1 else f'quotation-{index+1}'+p.suffix.lower()
+                        uploaded=client.post('/files',data={'purpose':'user_data'},files={'file':(name,file,FILE_TYPES[p.suffix.lower()])})
+                    uploaded.raise_for_status();file_ids.append(safe_id(uploaded.json().get('id')))
+                response=client.post('/responses',json={'model':settings.agent_id,'include':['last'],'input':[{'role':'user','content':[{'type':'input_file','file_id':file_id} for file_id in file_ids]}],'config_id':settings.config_id})
                 response.raise_for_status();job=response.json();job_id=safe_id(job.get('id'))
                 deadline=time.monotonic()+timeout
                 while job.get('status') in (None,'queued','in_progress'):
@@ -73,7 +76,7 @@ def run_agent(path,settings,transport=None,timeout=120):
                 if not isinstance(parsed,dict):raise AgentError('견적 추출 에이전트의 출력은 JSON 객체여야 합니다.')
                 return scrub(parsed,settings.api_key),scrub(dict(provider='upstage',agent_id=settings.agent_id,config_id=settings.config_id,response_id=job_id),settings.api_key)
             finally:
-                if file_id:
+                for file_id in file_ids:
                     try:client.delete('/files/'+file_id)
                     except httpx.HTTPError:pass
     except httpx.HTTPStatusError as error:
@@ -99,7 +102,7 @@ def merge_agent_result(q,result):
         if val is None or val=='':continue
         if key=='items':
             if not isinstance(val,list) or any(not isinstance(item,dict) for item in val):raise AgentError('에이전트 출력의 items 스키마를 확인해주세요.')
-            item_keys=('name','specification','unit','quantity','unit_price','amount','is_component','parent_index','option_group','original_text')
+            item_keys=('name','model','specification','unit','quantity','unit_price','amount','is_component','parent_index','option_group','option_choice','option_condition','original_text')
             q[key]=[{k:v for k,v in item.items() if k in item_keys} for item in val]
         elif isinstance(val,(str,int,float)):q[key]=val
         else:raise AgentError('에이전트 출력의 견적 필드 스키마를 확인해주세요.')

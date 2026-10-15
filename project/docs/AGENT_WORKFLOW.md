@@ -103,3 +103,10 @@ agent_runs 별도 테이블에 실행 ID, 역할, 대상 문서 ID와 버전, �
 작업실에서 PDF·Excel(.xls/.xlsx)·Word(.docx)·이미지(.png/.jpg/.jpeg)를 여러 개 등록한다. 이 단계는 기존 `/api/upload`의 로컬 분석만 사용해 보관함에 원본을 저장하며, 등록만으로 Studio에 보내지 않는다. 재추출과 누락·금액·조건 검토는 최대 5문서를 선택해 각 문서에 별도의 `POST /api/agent-runs` 요청을 순서대로 보내고 각 결과를 기존 `agent_runs`에 문서별로 보관한다. 한 문서가 실패해도 다음 문서를 처리하며 화면에 문서 이름별 오류를 표시한다. 비교는 기존처럼 2~5문서를 한 번의 분석 입력 PDF로 묶는다.
 
 원본 재추출은 보관된 원본 파일의 실제 확장자와 MIME 형식으로 Upstage Files API에 전송한다. Parse 입력 요구사항은 이 7개 확장자를 지원하지만, 이 프로젝트 Studio 추출 에이전트의 비 PDF 실호출 정확도는 아직 검증하지 않았다. 검토는 원본 형식과 관계없이 저장된 구조화 값을 분석용 PDF로 조립해 전송한다. 원본·정정·검토 완료 상태는 이 작업으로 바뀌지 않는다. 출처: https://console.upstage.ai/docs/capabilities/parse/input-requirements 및 https://console.upstage.ai/docs/agents.
+# 해커톤 연결 분석 갱신 (2026-10-15)
+
+기존 3개 Studio 에이전트의 실제 저장 설정은 `../agent_configs/studio_exports/`의 추출 v3, 검토 v2, 비교 v2다. 예전 v1 설정 파일은 당시 실행 이력 보존용이며, 현재 웹 기본값은 새 버전이다. 추출은 Parse→Classify→일반/대체 옵션/패키지·구성품/혼합/판단 보류별 Extract다. `document_type`, `classification_reason`, `items_json`, `item_evidence_json`을 반환한다. 검토는 `summary`, `review_level`, `scope`, `issues[]`의 중요도·근거·다음 행동을, 비교는 `summary`, `comparison_level`, `scope`, `item_matches[]`, `conditions[]`를 반환한다. Studio 내보내기 스키마와 서버 필드의 대응은 `tests/test_studio_exports.py`에서 확인한다.
+
+새 `/api/analysis-flows`는 요청 헤더의 개인 키와 외부 전송 동의를 사용하고 추출 원본, 검토의 원본+별도 추출 결과 PDF, 비교의 선택 문서 값 PDF를 순서대로 보낸다. [공식 Agents API](https://console.upstage.ai/docs/agents)의 다중 `input_file` 입력 형태를 사용한다. 응답·단계 상태·시간·문서 버전은 별도 `analysis_flows`에 기록한다. 원본 견적·정정·검토 완료 상태를 수정하지 않는다. 코드가 숫자 진단과 품목 조건/차액을 계산하고 Studio는 문서 유형·관계·확인 사항·품목 대응을 제안한다. AI 대응은 원본 확인이 필요하며, 저장값 코드 비교를 원본 전체 대조로 표시하지 않는다.
+
+Studio 웹에서 가상 문서 4종 분류 4/4와 유형별 필드, 검토·비교 구조화 응답을 확인했다. 작업 ID·오류 사례는 `../tests/studio-hackathon-results.json`에 있다. 앱의 실제 한 번에 분석 API는 허가된 테스트 키가 401을 반환해 추출 단계에서 중단됐고, 검토·비교 API 및 원본+추출 결과 다중 입력 정확도는 미검증이다. `../tests/live-submission-results.json`을 참조한다. 키는 소스·DB·문서에 기록하지 않았다.
