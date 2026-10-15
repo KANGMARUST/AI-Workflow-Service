@@ -1,21 +1,15 @@
-# AI-Workflow-Service
+# QuoteFlow 프로젝트 스타터
 
-기존 견적서를 보관·추출·정정·검색하고 Upstage Studio 에이전트로 검토·비교하는 프로젝트입니다. 앱 소스는 [project](project)에 있습니다.
+견적서 추출·검색·관리 서비스의 협업용 골격입니다. 실제 Upstage/Supabase 연동과 영속 저장은 구현하지 않았습니다.
 
-## Codex CLI 개발
+## 실행
+- 프론트엔드: `cd frontend && npm install && npm run dev`
+- 백엔드: `cp backend/.env.example backend/.env && docker compose -f backend/docker-compose.yml up --build`
+- API 문서: `http://localhost:8000/docs`
 
-이 저장소 폴더에서 CMD를 열고:
+## 구성
+- `frontend/`: React + Vite 대시보드 UI 초안
+- `backend/`: FastAPI 라우트/스키마, Docker, Supabase SQL 초안
+- `docs/`: 기획, API 계약, 가상 입력 데이터
 
-```cmd
-codex
-```
-
-루트의 진입 파일이 project 폴더의 CLI 설정과 작업 지침을 연결합니다. 기존 변경과 개발 기록을 확인한 뒤 원하는 작업을 요청하세요.
-
-- [프로젝트 개발 지침](project/AGENTS.md)
-- [CLI 실행 안내](project/docs/CLI_SETUP.md)
-- [개발 기록](project/DEVELOPMENT.md)
-- [에이전트·API 기록](project/docs/AGENT_WORKFLOW.md)
-- [앱 소개·설치](project/README.md)
-
-웹 시작은 `start.cmd`, 종료는 `stop.cmd`, 새 컴퓨터 의존성 설치는 `setup.cmd`입니다. 웹 주소는 http://127.0.0.1:5173 입니다. API 키는 웹의 사용자 API 설정에서 입력합니다.
+주의: 요청사항에 맞춰 `/api/extract`는 GET으로 두었지만, 추출 작업을 시작하는 동작은 부작용이 있으므로 실제 구현에서는 `POST /api/extract` 또는 `POST /api/extraction-jobs`로 분리하는 것을 권장합니다. 실제 견적서 샘플을 쓸 경우 개인정보를 익명화하세요.
