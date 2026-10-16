@@ -1,5 +1,5 @@
-# Local credentials and virtual environment
-.env
+# Track .env as requested; keep other local environment variants excluded.
+!.env
 .env.*
 !.env.example
 .venv/
