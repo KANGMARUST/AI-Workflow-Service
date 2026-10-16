@@ -27,7 +27,7 @@ QUOTE_COMPARE_CONFIG_ID=1
 
 ## 입력·출력
 
-- **추출:** 견적 PDF → 헤더, `items` 배열, `review_warnings`, 원문 보존용 `raw_fields_json`. XLSX는 백엔드에서 시트/셀을 추출하고 문서로 조립하는 경로를 별도 구현한다. 현재 Studio의 XLSX 직접 처리는 검증하지 않았다.
+- **추출:** 견적 PDF → 헤더, `items` 배열, `review_warnings`, 원문 보존용 `raw_fields_json`. XLS/XLSX는 백엔드에서 표시 시트의 셀을 읽고 PDF로 조립해 전달한다. 원본 Excel을 Studio에 직접 보내지 않는다. 지정된 XLS 1개와 PDF 2개 실호출은 `../INPUT_DOCUMENTS.md`에 정리했다.
 - **비교:** 검색한 과거 견적들의 ID·품목·규격·단위·통화·수량·날짜·거래조건을 백엔드가 한 PDF로 조립해 전달한다. `comparison_status`, 비교 행, 비교쌍, 제외 항목, 확인 질문을 반환한다. 동일 품목명만으로 같은 규격이라고 가정하지 않는다.
 
 숫자는 십진 **문자열**, 미기재는 빈 문자열이다. Studio Number 필드에서 누락 수량이 0으로 반환되는 사례를 확인해 타입을 바꾸고 재검증했다. 백엔드에서 빈값은 `None`, 명시된 값만 `Decimal`로 변환해야 한다. 0은 유효한 값일 수 있으므로 일괄 결측 처리하지 않는다.

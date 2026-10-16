@@ -49,7 +49,7 @@ def normalize_result(source):
                 warnings.append(f"{path}: 숫자 형식이 불명확합니다. 원문을 확인하세요.")
                 return None
         if key in dates:
-            text = str(value).strip()
+            text = re.sub(r"\s*([./-])\s*", r"\1", str(value).strip()).rstrip(".")
             for fmt in ("%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d", "%Y년 %m월 %d일"):
                 try:
                     return datetime.strptime(text, fmt).date().isoformat()

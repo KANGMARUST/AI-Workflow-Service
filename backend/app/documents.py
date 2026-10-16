@@ -8,6 +8,7 @@ from xml.sax.saxutils import escape
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+import xlrd
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -15,6 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .config import ROOT
+from .quote_layout import pdf_line_items
 
 
 class DocumentError(ValueError):
@@ -25,10 +27,10 @@ ALIASES = {
     "quote_number": ["견적번호", "quotationno", "quoteno", "견적서번호"],
     "title": ["제목", "견적명", "프로젝트명", "subject"],
     "issuer_company": ["발행회사", "공급사", "공급자", "공급업체", "issuer", "supplier"],
-    "customer_name": ["고객사", "거래처", "수신회사", "customer", "client"],
+    "customer_name": ["고객사", "거래처", "수신회사", "수신", "受信", "customer", "client"],
     "contact_name": ["담당자", "contactname"], "contact_email": ["이메일", "email"],
     "contact_phone": ["연락처", "전화번호", "phone"],
-    "issue_date": ["작성일", "발행일", "견적일", "견적일자", "issuedate"],
+    "issue_date": ["작성일", "발행일", "견적일", "견적일자", "發行日字", "issuedate"],
     "valid_until": ["유효기간", "유효일", "validuntil"], "delivery_date": ["납기일", "deliverydate"],
     "subtotal": ["공급가액", "소계", "subtotal"], "tax_amount": ["부가세", "부가가치세", "세액", "taxamount"],
     "tax_rate": ["세율", "taxrate"], "total_amount": ["총액", "합계금액", "총금액", "grandtotal", "totalamount"],
@@ -38,10 +40,10 @@ ALIASES = {
     "discount_terms": ["할인", "할인조건", "discount"], "notes": ["비고", "특이사항", "notes"],
 }
 ITEM_ALIASES = {
-    "item_name": ["품목명", "품명", "품목", "제품명", "itemname", "description"],
+    "item_name": ["품목명", "품명", "품목", "제품명", "品名", "itemname", "description"],
     "specification": ["규격", "사양", "모델", "specification", "model"],
-    "unit": ["단위", "unit"], "quantity": ["수량", "quantity", "qty"],
-    "unit_price": ["단가", "unitprice"], "amount": ["금액", "품목금액", "amount", "linetotal"],
+    "unit": ["단위", "單位", "unit"], "quantity": ["수량", "數量", "quantity", "qty"],
+    "unit_price": ["단가", "單價", "unitprice", "price"], "amount": ["금액", "품목금액", "공급가", "金額", "金額", "amount", "linetotal"],
 }
 
 
@@ -73,14 +75,77 @@ def validate_file(data: bytes, suffix: str, max_pages: int):
                     raise DocumentError("매크로 포함 문서는 지원하지 않습니다.")
         except (zipfile.BadZipFile, KeyError) as exc:
             raise DocumentError("XLSX 파일이 손상되었습니다.") from exc
+    elif suffix == ".xls":
+        open_xls(data).release_resources()
     else:
-        raise DocumentError("현재 .xlsx와 텍스트 PDF만 지원합니다.")
+        raise DocumentError("현재 .xls, .xlsx와 텍스트 PDF만 지원합니다.")
+
+
+def open_xls(data):
+    try:
+        if xlrd.inspect_format(content=data) != "xls":
+            raise DocumentError("확장자와 XLS 내용이 일치하지 않습니다.")
+        return xlrd.open_workbook(file_contents=data, on_demand=True, ragged_rows=True, logfile=io.StringIO())
+    except DocumentError:
+        raise
+    except Exception as exc:
+        raise DocumentError("XLS를 읽을 수 없습니다. 암호화 또는 손상 여부를 확인하세요.") from exc
+
+
+def read_xls(data):
+    workbook = open_xls(data)
+    tables, raw = [], []
+    warnings = ["XLS 수식・매크로・외부 연결은 실행하지 않습니다. 저장된 셀 결과만 읽으므로 계산 캐시가 없으면 원본 확인이 필요합니다."]
+    try:
+        if workbook.nsheets > 30:
+            raise DocumentError("시트는 최대 30개까지 지원합니다.")
+        for index in range(workbook.nsheets):
+            sheet = workbook.sheet_by_index(index)
+            if sheet.visibility != 0:
+                warnings.append("숨김 시트는 견적 추출 대상에서 제외했습니다.")
+                workbook.unload_sheet(index)
+                continue
+            if sheet.nrows * sheet.ncols > 100000:
+                raise DocumentError("시트 크기가 100,000셀을 초과합니다.")
+            rows, lines, character_count = [], [], 0
+            for row_index in range(sheet.nrows):
+                values = []
+                for cell in sheet.row(row_index):
+                    value = cell.value
+                    if cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+                        value = ""
+                    elif cell.ctype == xlrd.XL_CELL_DATE:
+                        value = xlrd.xldate_as_datetime(value, workbook.datemode).strftime("%Y-%m-%d")
+                    elif cell.ctype == xlrd.XL_CELL_ERROR:
+                        warnings.append("Excel 오류 셀이 있습니다. 해당 값은 추정하지 않았습니다.")
+                        value = ""
+                    elif cell.ctype == xlrd.XL_CELL_NUMBER:
+                        value = format(Decimal(str(value)), "f").rstrip("0").rstrip(".") if value % 1 else str(int(value))
+                    values.append(str(value).strip())
+                character_count += sum(map(len, values))
+                if character_count > 300000:
+                    raise DocumentError("시트 텍스트가 300,000자를 초과합니다.")
+                if any(values):
+                    rows.append(values)
+                    lines.append(f"행 {row_index+1}: " + " | ".join(f"열 {i+1}: {v}" for i, v in enumerate(values) if v))
+            tables.append(rows)
+            raw.append(f"[시트: {sheet.name}]\n" + "\n".join(lines))
+            workbook.unload_sheet(index)
+    except DocumentError:
+        raise
+    except Exception as exc:
+        raise DocumentError("XLS 셀을 읽지 못했습니다. 원본의 날짜・값・손상 여부를 확인하세요.") from exc
+    finally:
+        workbook.release_resources()
+    return tables, raw, warnings
 
 
 def read_document(data, suffix, max_pages=100):
     validate_file(data, suffix, max_pages)
-    warnings, tables, raw = [], [], []
-    if suffix == ".xlsx":
+    warnings, tables, raw, page_texts = [], [], [], []
+    if suffix == ".xls":
+        tables, raw, warnings = read_xls(data)
+    elif suffix == ".xlsx":
         try:
             for cached in (True, False):
                 workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=cached, keep_links=False)
@@ -88,6 +153,9 @@ def read_document(data, suffix, max_pages=100):
                     if len(workbook.sheetnames) > 30:
                         raise DocumentError("시트는 최대 30개까지 지원합니다.")
                     for sheet in workbook:
+                        if sheet.sheet_state != "visible":
+                            warnings.append("숨김 시트는 견적 추출 대상에서 제외했습니다.")
+                            continue
                         if sheet.max_row and sheet.max_column and sheet.max_row*sheet.max_column > 100000:
                             raise DocumentError("시트 크기가 100,000셀을 초과합니다.")
                         rows, cell_count, character_count = [], 0, 0
@@ -124,7 +192,9 @@ def read_document(data, suffix, max_pages=100):
             import pdfplumber
             with pdfplumber.open(io.BytesIO(data)) as pdf:
                 for i, page in enumerate(pdf.pages):
-                    raw.append(f"[페이지 {i+1}]\n" + (page.extract_text() or ""))
+                    page_text = page.extract_text() or ""
+                    page_texts.append(page_text)
+                    raw.append(f"[페이지 {i+1}]\n" + page_text)
                     tables.extend(page.extract_tables() or [])
         except ImportError:
             from pdfminer.high_level import extract_text
@@ -135,9 +205,22 @@ def read_document(data, suffix, max_pages=100):
     text = "\n\n".join(raw)
     if len(text) > 300000:
         raise DocumentError("추출 텍스트가 300,000자를 초과합니다.")
-    if not re.search(r"[가-힣A-Za-z0-9]", re.sub(r"\[페이지 \d+\]", "", text)):
-        raise DocumentError("텍스트가 없는 스캔 PDF입니다. OCR 지원은 별도 확장 범위입니다.")
-    return {"text": text, "tables": tables, "warnings": sorted(set(warnings))}
+    content_text = re.sub(r"\[(?:페이지 \d+|시트: [^\]]*|원본 수식: [^\]]*)\]", "", text)
+    if not re.search(r"[가-힣A-Za-z0-9一-龥]", content_text):
+        message = "텍스트가 없는 스캔 PDF입니다. OCR 지원은 별도 확장 범위입니다." if suffix == ".pdf" else "표시 시트에 읽을 수 있는 셀 내용이 없습니다."
+        raise DocumentError(message)
+    line_items = pdf_line_items(page_texts)
+    if line_items:
+        warnings.append("품목 수량·단가·금액은 명시된 PDF 텍스트 행으로 대조했습니다. 화면 표기와 텍스트 레이어가 다를 수 있으므로 원본을 확인하세요.")
+    selection_required = bool(re.search(r"\d+번[^\n]*선택|선택\s*옵션|택\s*일", text))
+    document = {"text": text, "tables": tables, "warnings": sorted(set(warnings)), "line_items": line_items, "selection_required": selection_required}
+    if suffix == ".xls":
+        candidates = local_extract(document)["items"]
+        if candidates and all(all(re.fullmatch(r"\d+(?:\.\d+)?", str(row.get(k) or "").replace(",", "")) for k in ("quantity", "unit_price", "amount")) and row.get("unit") for row in candidates):
+            for row in candidates:
+                row["raw_fields"]["source"] = "xls_table"
+            document["line_items"] = candidates
+    return document
 
 
 def local_extract(document):
@@ -162,12 +245,16 @@ def local_extract(document):
             values = [str(x if x is not None else "").strip() for x in row]
             for i, value in enumerate(values[:-1]):
                 key = lookup.get(norm(value))
-                if key and values[i+1]:
-                    result.setdefault(key, values[i+1])
-                    result["raw_fields"].setdefault(key, values[i+1])
-            header = {i: k for i, value in enumerate(values) for k, names in ITEM_ALIASES.items() if norm(value) in names}
+                if not key:
+                    continue
+                value = next((v for v in values[i+1:] if v), "")
+                if value and norm(value) not in lookup:
+                    result.setdefault(key, value)
+                    result["raw_fields"].setdefault(key, value)
+            header = {i: k for i, value in enumerate(values) for k, names in ITEM_ALIASES.items() if norm(value) in {norm(name) for name in names}}
             if "item_name" in header.values() and len(header) >= 2:
-                mapping = header
+                if mapping is None or len(header) >= len(mapping):
+                    mapping = header
                 continue
             if mapping:
                 item = {key: values[i] if i < len(values) else "" for i, key in mapping.items()}
@@ -175,9 +262,16 @@ def local_extract(document):
                     continue
                 if norm(item["item_name"]) in lookup or norm(item["item_name"]) in {"합계", "총계", "total"}:
                     continue
+                if not any(item.get(k) for k in ("quantity", "unit_price", "amount")):
+                    result["raw_fields"].setdefault("unpriced_rows", []).append(item["item_name"])
+                    continue
                 item["original_item_name"] = item["item_name"]
                 item["raw_fields"] = dict(item)
                 result["items"].append(item)
+    if document.get("line_items"):
+        result["items"] = document["line_items"]
+    if document.get("selection_required"):
+        result["raw_fields"]["selection_required"] = True
     if result.get("tax_amount"):
         tax = re.fullmatch(r"([\d,]+(?:\.\d+)?)\s*원?\s*\(([\d.]+)\s*%\)", str(result["tax_amount"]))
         if tax:

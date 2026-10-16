@@ -23,6 +23,9 @@ def diagnostics(data: dict):
         warn("missing_items", "items", "추출된 품목이 없습니다.")
     computed = []
     signatures = set()
+    has_components = any(x.get("raw_fields", {}).get("included_in_parent") is True for x in items)
+    if has_components:
+        warn("hierarchical_items", "items", "구성품은 상위 품목에 포함됩니다. 합계 검사는 상위 품목만 사용하며 구성품 수량은 상위 세트당 수량일 수 있습니다.")
     for i, item in enumerate(items):
         path = f"items.{i}"
         for key in ("specification", "unit", "quantity", "unit_price", "amount"):
@@ -39,8 +42,11 @@ def diagnostics(data: dict):
         if signature in signatures:
             warn("possible_duplicate_item", path, "같은 내용의 품목 행이 있습니다. 원본의 반복 행인지 확인하세요.")
         signatures.add(signature)
-    amounts = [dec(x.get("amount")) for x in items]
-    total_lines = sum(amounts, Decimal(0)) if items and all(x is not None for x in amounts) else None
+    amounts = [dec(x.get("amount")) for x in items if x.get("raw_fields", {}).get("included_in_parent") is not True]
+    selection_required = data.get("raw_fields", {}).get("selection_required") is True
+    if selection_required:
+        warn("option_selection_required", "items", "서로 선택해야 하는 옵션 품목이 있습니다. 전체 품목을 합산하지 않고 총액은 원문값을 유지합니다.")
+    total_lines = sum(amounts, Decimal(0)) if amounts and not selection_required and all(x is not None for x in amounts) else None
     subtotal, tax, total = (dec(data.get(k)) for k in ("subtotal", "tax_amount", "total_amount"))
     line_basis = total if data.get("tax_basis") == "inclusive" else subtotal
     if total_lines is not None and line_basis is not None and total_lines != line_basis:

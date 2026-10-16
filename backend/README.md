@@ -114,7 +114,7 @@ PATCH 미전달 필드는 유지하고 명시적인 null은 지운다. `items`�
 
 `POST /api/status/{id}` 본문 예: `{"status":"confirmed","note":"원본 대조 완료","expected_version":4}`. 상태는 `review_required`, `extracting`, `confirmed`, `rejected`, `archived`. extracting은 시스템 작업 API에서만 설정한다. 그 외 상태 전이를 추가로 제한하지 않으며 담당자 검토 메모를 기록할 수 있다.
 
-새로고침 후에는 `GET /api/extract?quote_id=...`의 `latest_job`으로 작업 폴링을 재개할 수 있다. 이 응답의 `source_text`, `source_fields`는 저장된 최초 추출 원문/결과이고 `extracted_fields`는 현재 수정값이다. `GET /api/quotes/{id}/jobs`는 해당 견적의 작업 이력을 페이지 단위로 반환한다.
+새로고침 후에는 `GET /api/extract?quote_id=...`의 `latest_job`으로 작업 폴링을 재개할 수 있다. 이 응답의 `source_text`, `source_fields`는 저장된 추출 원문 및 원문 행 대조가 반영된 결과이고 `extracted_fields`는 현재 수정값이다. `GET /api/quotes/{id}/jobs`는 해당 견적의 작업 이력을 페이지 단위로 반환한다.
 
 원본은 `GET /api/quotes/{id}/source`, 이력은 `GET /api/quotes/{id}/history?limit=20&offset=0`. 인증이 켜졌다면 원본도 fetch로 Authorization 헤더를 넣어 Blob으로 연다.
 
@@ -177,7 +177,7 @@ backend/.venv/Scripts/python.exe -u backend/tools/live_agent_check.py --live --a
 backend/.venv/Scripts/python.exe -u backend/tools/live_agent_check.py --live --api --xlsx
 ```
 
-Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증이다. 로컬 파서는 명시된 라벨과 품목 표를 처리하는 보조 기능이며 자유 양식의 의미 추출은 Studio 및 담당자 검토가 필요하다. 스캔/OCR·구형 XLS·Word·기업별 양식·수주/매출 데이터·조직별 로그인은 확장 범위다.
+Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증이다. 로컬 파서는 명시된 라벨과 품목 표를 처리하는 보조 기능이며 자유 양식의 의미 추출은 Studio 및 담당자 검토가 필요하다. 스캔/OCR·Word·기업별 양식·수주/매출 데이터·조직별 로그인은 확장 범위다.
 
 ## 코드 위치
 
@@ -190,3 +190,16 @@ Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증
 - `supabase/schema.sql`: 빈 PostgreSQL용 초기 DDL, `tools/export_schema.py`: 재생성
 
 외부 호출 방식은 [Upstage Agents API](https://console.upstage.ai/docs/agents)와 [작업 생성 API](https://console.upstage.ai/ko/api/agents/jobs/create-job), [해커톤 가이드북](https://ku-sejong-hackathon-playbook.vercel.app/#sec5)을 따른다.
+
+## 지정 입력 문서 지원
+
+입력은 `.xls`, `.xlsx`, 텍스트 PDF다. 지정된 `docs/input-data/`의 견적 3개에 대한 처리 방식, 선택 옵션·상위/구성품 관계와 검증 결과는 [입력 문서 지원 안내](INPUT_DOCUMENTS.md)에 정리했다. `sample_quotes.csv`, README 및 `~$` 임시 파일은 이 검사 대상에서 제외한다.
+
+```powershell
+# 로컬 읽기만 검사: 외부 호출 없음
+backend/.venv/Scripts/python.exe -u backend/tools/check_input_documents.py
+# 실제 지정 문서를 Studio로 보내 API 흐름 검사: API 사용량 발생
+backend/.venv/Scripts/python.exe -u backend/tools/check_input_documents.py --live
+```
+
+이 도구는 실제 문서를 읽으므로 실행 범위를 먼저 확인한다. 별도 `.runtime/input-document-check/` DB와 파일에 결과를 저장하고 기본 서비스 DB나 입력 원본을 수정하지 않는다.

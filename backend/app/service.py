@@ -11,6 +11,7 @@ from .database import Job, Quote, now, uid
 from .documents import DocumentError, agent_input, local_extract, make_pdf, read_document, validate_file
 from .domain import compare_quotes, parse_json_field
 from .extraction import normalize_result
+from .quote_layout import apply_document_rows
 from .repository import detail, ensure_idle, record, require, set_fields
 from .schemas import QuoteFields
 from .upstage import AgentError, UpstageClient
@@ -120,7 +121,7 @@ class Service:
             document = read_document(content, suffix, self.config.max_document_pages)
             remote = {}
             if provider == "upstage":
-                pdf = content if suffix == ".pdf" else make_pdf("견적서 XLSX 셀·표 원문", document["text"].splitlines(), self.config.pdf_font_path)
+                pdf = content if suffix == ".pdf" else make_pdf(f"견적서 {suffix[1:].upper()} 셀·표 원문", document["text"].splitlines(), self.config.pdf_font_path)
                 remote = self.agent.run(pdf, self.config.quote_extract_agent_id, self.config.quote_extract_config_id)
                 extracted = remote["data"]
             else:
@@ -131,7 +132,11 @@ class Service:
             for key in ("tax_terms", "tax_basis"):
                 if not extracted.get(key) and tax_fields.get(key):
                     extracted[key] = tax_fields[key]
+            agent_fields = copy.deepcopy(extracted)
+            extracted = apply_document_rows(extracted, document)
             fields, warnings = normalize_result(extracted)
+            if document.get("selection_required"):
+                fields["raw_fields"]["selection_required"] = True
             warnings += document["warnings"]
             if provider == "local":
                 warnings.append("로컬 규칙 기반 추출입니다. 다양한 양식의 의미 분류는 Studio 추출 또는 담당자 확인이 필요합니다.")
@@ -139,7 +144,7 @@ class Service:
                 job = session.get(Job, job_id)
                 q = require(session, job.quote_id)
                 set_fields(q, fields)
-                q.extraction_raw = {"provider": provider, "text": document["text"], "fields": extracted, "warnings": warnings,
+                q.extraction_raw = {"provider": provider, "text": document["text"], "fields": extracted, "agent_fields": agent_fields, "warnings": warnings,
                                     **{k: v for k, v in remote.items() if k != "data"}}
                 q.status, q.extraction_status = "review_required", "completed"
                 record(session, q, "extraction_completed")

@@ -220,4 +220,4 @@ def stats(request: Request):
 @router.get("/capabilities", summary="프론트 연결용 지원 기능·설정 상태")
 def capabilities(request: Request):
     config = svc(request).config
-    return {"supported_extensions": [".xlsx", ".pdf"], "max_upload_mb": config.max_upload_mb, "max_document_pages": config.max_document_pages, "upstage_configured": bool(config.upstage_api_key.get_secret_value()) and not config.upstage_api_key.get_secret_value().startswith("replace-"), "database": svc(request).db.engine.dialect.name, "statuses": [s.value for s in QuoteStatus], "authentication_required": bool(config.api_token.get_secret_value())}
+    return {"supported_extensions": [".xls", ".xlsx", ".pdf"], "max_upload_mb": config.max_upload_mb, "max_document_pages": config.max_document_pages, "upstage_configured": bool(config.upstage_api_key.get_secret_value()) and not config.upstage_api_key.get_secret_value().startswith("replace-"), "database": svc(request).db.engine.dialect.name, "statuses": [s.value for s in QuoteStatus], "authentication_required": bool(config.api_token.get_secret_value())}

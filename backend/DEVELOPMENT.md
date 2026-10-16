@@ -63,7 +63,7 @@ print("Health and OpenAPI OK")
 '@ | .\.venv\Scripts\python.exe -
 ```
 
-자동 테스트 35개는 `.\.venv\Scripts\python.exe -m pytest tests -q --basetemp=.runtime/pytest`로 실행한다. 별도 임시 DB·파일 경로를 사용하며 실제 Upstage API는 호출하지 않는다. 외부 API 실검증은 `README.md`의 명시적인 `tools/live_agent_check.py --live` 절차를 따른다.
+자동 테스트 44개는 `.\.venv\Scripts\python.exe -m pytest tests -q --basetemp=.runtime/pytest`로 실행한다. 별도 임시 DB·파일 경로를 사용하며 실제 Upstage API는 호출하지 않는다. 외부 API 실검증은 `README.md`의 명시적인 `tools/live_agent_check.py --live` 절차를 따른다.
 
 ## Codex 작업 방식
 
