@@ -135,13 +135,6 @@ class CompareRequest(InputModel):
         return self
 
 
-class DraftRequest(InputModel):
-    overrides: QuoteEditRequest = Field(default_factory=QuoteEditRequest)
-    tax_rate: Money | None = None
-    tax_basis: Literal["exclusive", "inclusive"] | None = None
-
-
 class AgentRequest(InputModel):
-    kind: Literal["compare", "draft"]
-    quote_ids: list[str] = Field(min_length=1, max_length=5)
-    draft_request: DraftRequest | None = None
+    kind: Literal["compare"]
+    quote_ids: list[str] = Field(min_length=2, max_length=5)

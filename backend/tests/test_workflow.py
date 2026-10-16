@@ -132,33 +132,43 @@ def test_missing_ids_and_state(client):
     assert client.post("/api/extract", json={"quote_id": q["quote_id"], "provider": "local"}).status_code == 409
 
 
-def test_draft_comparison_exports(client):
+def test_comparison_exports(client):
     original = extract(client, upload(client)["quote_id"])
-    item = {k: v for k, v in original["items"][0].items() if k not in ("item_id", "line_number")}
-    item.update(quantity="12", unit_price="24000")
-    draft = client.post(f"/api/quotes/{original['quote_id']}/drafts", json={"overrides": {"items": [item], "issue_date": "2026-10-17", "title": "=HYPERLINK(\"bad\")"}, "tax_rate": "10", "tax_basis": "exclusive"})
-    assert draft.status_code == 201, draft.text
-    draft = draft.json()
-    assert draft["subtotal"] == "288000.0000" and draft["total_amount"] == "316800.0000"
-    assert draft["quote_number"] is None and draft["kind"] == "draft"
-    assert client.post(f"/api/quotes/{original['quote_id']}/drafts", json={"overrides": {"expected_version": 1}}).status_code == 409
+    second = extract(client, upload(client, xlsx(suffix="2"))["quote_id"])
+    item = {k: v for k, v in second["items"][0].items() if k not in ("item_id", "line_number")}
+    item.update(quantity="12", unit_price="24000", amount="288000")
+    response = client.patch(f"/api/quotes/{second['quote_id']}", json={"items": [item], "total_amount": "316800", "issue_date": "2026-10-17", "title": '=HYPERLINK("bad")'})
+    assert response.status_code == 200
+    second = response.json()
     assert client.get("/api/quotes/"+original["quote_id"]).json()["items"][0]["quantity"] == "10"
-    comparison = client.post("/api/compare", json={"quote_ids": [original["quote_id"], draft["quote_id"]]}).json()
+    comparison = client.post("/api/compare", json={"quote_ids": [original["quote_id"], second["quote_id"]]}).json()
     assert comparison["comparison_status"] == "conditional"
     assert comparison["pairs"][0]["price_difference"] == "-1000"
     assert client.get("/api/items/history", params={"keyword": "센서"}).json()["total"] == 2
-    data = client.get(f"/api/quotes/{draft['quote_id']}/export", params={"format": "xlsx"})
+    data = client.get(f"/api/quotes/{second['quote_id']}/export", params={"format": "xlsx"})
     assert data.status_code == 200
     wb = load_workbook(io.BytesIO(data.content), data_only=False)
     assert not any(c.data_type == "f" for row in wb.active for c in row)
-    assert any(c.value == "316800.0000" for row in wb.active for c in row)
+    assert any(c.value == "316800" for row in wb.active for c in row)
     wb.close()
-    pdf = client.get(f"/api/quotes/{draft['quote_id']}/export", params={"format": "pdf"})
+    pdf = client.get(f"/api/quotes/{second['quote_id']}/export", params={"format": "pdf"})
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
     import pdfplumber
     with pdfplumber.open(io.BytesIO(pdf.content)) as parsed:
         text = "\n".join(p.extract_text() or "" for p in parsed.pages)
     assert "온도 센서" in text and "316,800" in text
+
+
+def test_removed_draft_entry_points(client, app):
+    q = upload(client)
+    assert client.post(f"/api/quotes/{q['quote_id']}/drafts", json={}).status_code == 404
+    response = client.post("/api/agent-runs", json={"kind": "draft", "quote_ids": [q["quote_id"]]})
+    assert response.status_code == 422
+    schema = client.get("/openapi.json").json()
+    assert not any("/drafts" in path for path in schema["paths"])
+    assert schema["components"]["schemas"]["AgentRequest"]["properties"]["kind"]["const"] == "compare"
+    assert not hasattr(app.state.config, "quote_draft_agent_id")
+    assert client.get("/api/quotes/"+q["quote_id"]).json()["version"] == q["version"]
 
 
 def test_local_pdf_sample(client):
@@ -243,27 +253,19 @@ def test_api_extraction_failure_keeps_original(client, app):
     assert client.get(f"/api/quotes/{q['quote_id']}/source").status_code == 200
 
 
-def test_tax_basis_and_discount_are_not_assumed(client):
-    original = extract(client, upload(client)["quote_id"])
-    url = f"/api/quotes/{original['quote_id']}/drafts"
-    unspecified = client.post(url, json={"tax_rate": "10"}).json()
-    assert unspecified["subtotal"] == "250000.0000"
-    assert unspecified["total_amount"] is None
-    inclusive = client.post(url, json={"tax_rate": "10", "tax_basis": "inclusive"}).json()
-    assert inclusive["total_amount"] == "250000.0000"
-    assert inclusive["subtotal"] == "227272.7273"
-    assert inclusive["tax_amount"] == "22727.2727"
-    discounted = client.post(url, json={"tax_rate": "10", "tax_basis": "exclusive", "overrides": {"discount_terms": "합계에서 5% 할인"}}).json()
-    assert discounted["total_amount"] is None
-    assert any(w["code"] == "discount_requires_review" for w in discounted["validation"]["warnings"])
-
-
-def test_mixed_currency_never_summed(client):
-    original = upload(client)
-    rows = [{"item_name": "A", "quantity": "1", "unit_price": "10", "currency": "KRW"}, {"item_name": "B", "quantity": "1", "unit_price": "10", "currency": "USD"}]
-    q = client.post(f"/api/quotes/{original['quote_id']}/drafts", json={"overrides": {"items": rows}, "tax_rate": "0"}).json()
-    assert q["subtotal"] is None and q["total_amount"] is None
-    assert any(w["code"] == "mixed_currencies" for w in q["validation"]["warnings"])
+def test_discount_and_mixed_currency_warnings(client):
+    q = upload(client)
+    response = client.patch(f"/api/quotes/{q['quote_id']}", json={
+        "discount_terms": "합계에서 5% 할인",
+        "total_amount": "123",
+        "items": [{"item_name": "A", "quantity": "1", "unit_price": "10", "amount": "10", "currency": "KRW"},
+                  {"item_name": "B", "quantity": "1", "unit_price": "10", "amount": "10", "currency": "USD"}]
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_amount"] == "123"  # Editing preserves the reviewed source amount.
+    codes = {w["code"] for w in data["validation"]["warnings"]}
+    assert {"discount_requires_review", "mixed_currencies"} <= codes
 
 
 def test_failed_job_retry_and_busy_guard(client, app):
@@ -293,14 +295,14 @@ def test_agent_workers_validate_results(client, app):
     app.state.config.upstage_api_key = SecretStr("test-only-key")
     fixtures = {
         "compare": {"comparison_status": "conditional", "comparison_rows_json": "[]", "comparable_pairs_json": "[]", "excluded_rows_json": "[]"},
-        "draft": {"draft_status": "needs_input", "draft_items_json": "[]", "terms_json": "{}", "changes_json": "[]"},
     }
     def run(pdf, agent, config):
         assert pdf.startswith(b"%PDF-")
-        kind = "compare" if agent == app.state.config.quote_compare_agent_id else "draft"
+        assert agent == app.state.config.quote_compare_agent_id
+        kind = "compare"
         return {"data": fixtures[kind], "remote_job_id": "job-mocked", "input_file_deleted": True}
     app.state.service.agent.run = run
-    for kind, ids in (("compare", [a["quote_id"], b["quote_id"]]), ("draft", [a["quote_id"]])):
+    for kind, ids in (("compare", [a["quote_id"], b["quote_id"]]),):
         response = client.post("/api/agent-runs", json={"kind": kind, "quote_ids": ids})
         assert response.status_code == 202
         result = client.get("/api/jobs/"+response.json()["job_id"]).json()
@@ -339,5 +341,3 @@ def test_fractional_decimal_calculation(client):
     data = client.patch("/api/edit/"+q["quote_id"], json={"items": [{"item_name": "소수 품목", "quantity": "0.1", "unit_price": "0.2", "amount": "0.02"}]}).json()
     assert data["validation"]["computed_item_amounts"] == ["0.02"]
     assert not any(w["code"] == "line_amount_mismatch" for w in data["validation"]["warnings"])
-    draft = client.post(f"/api/quotes/{q['quote_id']}/drafts", json={"tax_rate": "0"}).json()
-    assert draft["total_amount"] == "0.0200"

@@ -20,7 +20,7 @@ if (-not (Test-Path backend/.env)) {
 
 Python 3.12는 Docker와 맞춘 버전이다. 없으면 uv가 다운로드한다. 기존 `.venv`가 있으면 생성 명령을 생략한다. 네트워크나 uv 캐시 접근이 Codex 권한 정책에 막히면 해당 명령에 필요한 승인을 요청한다.
 
-`.env`의 예시 키는 실제 연동용이 아니다. 외부 키가 없으면 로컬 저장·추출·검토·비교·초안 출력이 가능하다. Studio를 사용할 때 `UPSTAGE_API_KEY`와 Agent/Config ID를 설정한다. Supabase 직접 연결에는 `DATABASE_URL`을 사용한다. `.env`와 `.venv/`, `.runtime/`은 Git에서 제외한다. 최신 기능과 전체 API 계약은 `README.md`에 있다.
+`.env`의 예시 키는 실제 연동용이 아니다. 외부 키가 없으면 로컬 저장·추출·검토·비교·견적 출력이 가능하다. Studio를 사용할 때 `UPSTAGE_API_KEY`와 Agent/Config ID를 설정한다. Supabase 직접 연결에는 `DATABASE_URL`을 사용한다. `.env`와 `.venv/`, `.runtime/`은 Git에서 제외한다. 최신 기능과 전체 API 계약은 `README.md`에 있다.
 
 ## 서버 실행
 

@@ -40,7 +40,7 @@ def create_app(config: Settings | None = None):
         finally:
             db.engine.dispose()
 
-    app = FastAPI(title="QuoteFlow API", description="견적서 등록·추출·검토·검색·비교·초안 출력", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="QuoteFlow API", description="견적서 등록·추출·검토·검색·비교·출력", version="1.0.0", lifespan=lifespan)
     app.state.config = config
     app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in config.cors_origins.split(",") if x.strip()], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     app.include_router(router, prefix=config.api_prefix, dependencies=[Depends(authorize)])

@@ -3,7 +3,6 @@ import re
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 from itertools import combinations
 
-from .schemas import QuoteFields
 
 
 def dec(value):
@@ -100,45 +99,6 @@ def compare_quotes(quotes, item_name=None):
             excluded.append({"quote_id": key[0], "line_number": key[1], "reason": "동일 품목·규격·단위·통화의 다른 견적이 없습니다."})
     status = "insufficient_data" if not pairs else "conditional" if any(x["comparability"] == "conditional" for x in pairs) else "comparable"
     return {"comparison_status": status, "rows": rows, "pairs": pairs, "excluded_rows": excluded, "warnings": ["과거 제시 단가이며 실제 매출·수주·시장가격을 의미하지 않습니다. 적용 단가는 담당자가 확정하세요."]}
-
-
-def calculate_draft(data, tax_rate=None, tax_basis=None):
-    result = dict(data)
-    items = []
-    for original in data.get("items", []):
-        item = dict(original)
-        qty, price = dec(item.get("quantity")), dec(item.get("unit_price"))
-        with localcontext() as ctx:
-            ctx.prec = 38
-            item["amount"] = str((qty*price).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)) if qty is not None and price is not None else None
-        items.append(item)
-    result["items"] = items
-    amounts = [dec(x["amount"]) for x in items]
-    currencies = {x.get("currency") or data.get("currency") for x in items}
-    subtotal = sum(amounts, Decimal(0)) if items and len(currencies) <= 1 and all(x is not None for x in amounts) else None
-    rate = dec(tax_rate) if tax_rate is not None else dec(data.get("tax_rate"))
-    result["tax_rate"] = str(rate) if rate is not None else None
-    basis = tax_basis or data.get("tax_basis")
-    result["tax_basis"] = basis
-    if basis:
-        result["tax_terms"] = "부가세 포함" if basis == "inclusive" else "부가세 별도"
-    tax, total = None, None
-    discount = data.get("discount_terms")
-    supported = not discount or normalized(discount) in {"없음", "무할인", "할인없음", "none"}
-    if subtotal is not None and rate is not None and supported:
-        with localcontext() as ctx:
-            ctx.prec = 38
-            if basis == "exclusive" or rate == 0:
-                tax = (subtotal*rate/100).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
-                total = subtotal+tax
-            elif basis == "inclusive":
-                total = subtotal
-                subtotal = (total/(1+rate/100)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
-                tax = total-subtotal
-    result["subtotal"] = str(subtotal) if subtotal is not None else None
-    result["tax_amount"] = str(tax) if tax is not None else None
-    result["total_amount"] = str(total) if total is not None else None
-    return QuoteFields.model_validate(result).model_dump(mode="json")
 
 
 def parse_json_field(value, default):

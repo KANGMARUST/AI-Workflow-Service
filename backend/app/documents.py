@@ -214,7 +214,7 @@ def quote_pdf(quote, custom_font=None):
     style = ParagraphStyle("body", fontName=font, fontSize=9, leading=13, wordWrap="CJK")
     p = lambda value: Paragraph(escape(str(value if value is not None else "미기재")), style)
     title_style = ParagraphStyle("title", parent=style, fontSize=18, leading=25)
-    parts = [Paragraph("견적서 초안" if quote["kind"] == "draft" else "견적 아카이브 사본", title_style), Spacer(1, 14)]
+    parts = [Paragraph("견적 아카이브 사본", title_style), Spacer(1, 14)]
     for key, label in [("quote_number", "견적번호"), ("title", "제목"), ("issuer_company", "발행회사"), ("customer_name", "고객사"), ("issue_date", "작성일"), ("valid_until", "유효기간"), ("delivery_date", "납기일")]:
         parts.append(p(f"{label}: {quote.get(key) or '미기재'}"))
     parts.append(Spacer(1, 14))
@@ -239,7 +239,7 @@ def quote_xlsx(quote):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "견적서"
-    rows = [["견적서 초안" if quote["kind"] == "draft" else "견적 아카이브 사본"], ["상태", STATUS_LABELS[quote["status"]]], ["버전", quote["version"]]]
+    rows = [["견적 아카이브 사본"], ["상태", STATUS_LABELS[quote["status"]]], ["버전", quote["version"]]]
     for key in ("quote_number", "title", "issuer_company", "customer_name", "issue_date", "valid_until", "delivery_date", "currency"):
         label = {"quote_number": "견적번호", "title": "제목", "issuer_company": "발행 회사", "customer_name": "고객사", "issue_date": "작성일", "valid_until": "유효기간", "delivery_date": "납기일", "currency": "통화"}[key]
         rows.append([label, quote.get(key)])

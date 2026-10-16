@@ -21,8 +21,6 @@ class Settings(BaseSettings):
     quote_extract_config_id: str = "3"
     quote_compare_agent_id: str = "agt_Tm6UnDBS47q2W3EJ5NEQKQ"
     quote_compare_config_id: str = "1"
-    quote_draft_agent_id: str = "agt_Re8sxTcZDG3e5TDktLHQUD"
-    quote_draft_config_id: str = "1"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     api_token: SecretStr = SecretStr("")
     max_upload_mb: int = Field(default=20, ge=1, le=100)

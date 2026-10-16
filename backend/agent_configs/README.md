@@ -6,7 +6,7 @@
 
 - 기획서: https://app.notion.com/p/3f827af47d0e802e9c04d6a9dc6c68e0
 - 사용 가이드: https://ku-sejong-hackathon-playbook.vercel.app/#sec5
-- 기획서에는 추출·검토·검색·조건별 단가 비교뿐 아니라 과거 견적 재사용 및 지정 양식 Excel/PDF 초안 출력도 MVP로 포함된다. 현재 저장소의 골격보다 범위가 넓다.
+- 현재 범위는 추출·검토·검색·조건별 단가 비교다. 초안 생성 및 AI 초안 제안은 사용자 요청으로 제거했다.
 - 가이드의 문서 → Parse → Extract → JSON 패턴을 적용했다. 출력 스키마를 동일하게 유지하므로 Classify 분기 대신 결과 상태 필드를 사용한다. AI 검토는 사용자 확정을 대신하지 않는다.
 
 ## 연결 정보
@@ -15,15 +15,12 @@
 |---|---|---|
 | 견적 추출·검토 | `agt_PDRAagZCX2rzbqfEm7J5QA` | `3` |
 | 조건별 단가 비교 | `agt_Tm6UnDBS47q2W3EJ5NEQKQ` | `1` |
-| 과거 견적 재사용 초안 | `agt_Re8sxTcZDG3e5TDktLHQUD` | `1` |
 
 ```dotenv
 QUOTE_EXTRACT_AGENT_ID=agt_PDRAagZCX2rzbqfEm7J5QA
 QUOTE_EXTRACT_CONFIG_ID=3
 QUOTE_COMPARE_AGENT_ID=agt_Tm6UnDBS47q2W3EJ5NEQKQ
 QUOTE_COMPARE_CONFIG_ID=1
-QUOTE_DRAFT_AGENT_ID=agt_Re8sxTcZDG3e5TDktLHQUD
-QUOTE_DRAFT_CONFIG_ID=1
 ```
 
 위 변수명은 현재 `app/config.py`가 읽는다. `UPSTAGE_API_KEY`는 로컬 `.env`에서만 관리한다. 다른 계정에서는 JSON을 가져온 뒤 그 계정의 Agent/Config ID를 다시 확인해야 한다. 전체 API 계약은 `../README.md`를 참고한다.
@@ -32,7 +29,6 @@ QUOTE_DRAFT_CONFIG_ID=1
 
 - **추출:** 견적 PDF → 헤더, `items` 배열, `review_warnings`, 원문 보존용 `raw_fields_json`. XLSX는 백엔드에서 시트/셀을 추출하고 문서로 조립하는 경로를 별도 구현한다. 현재 Studio의 XLSX 직접 처리는 검증하지 않았다.
 - **비교:** 검색한 과거 견적들의 ID·품목·규격·단위·통화·수량·날짜·거래조건을 백엔드가 한 PDF로 조립해 전달한다. `comparison_status`, 비교 행, 비교쌍, 제외 항목, 확인 질문을 반환한다. 동일 품목명만으로 같은 규격이라고 가정하지 않는다.
-- **초안:** 원본 견적과 사용자가 확정한 수량·적용 단가·조건을 PDF로 조립해 전달한다. 변경사항, 초안 품목, 미정 조건 질문을 반환한다. 실제 파일을 생성하지 않는다.
 
 숫자는 십진 **문자열**, 미기재는 빈 문자열이다. Studio Number 필드에서 누락 수량이 0으로 반환되는 사례를 확인해 타입을 바꾸고 재검증했다. 백엔드에서 빈값은 `None`, 명시된 값만 `Decimal`로 변환해야 한다. 0은 유효한 값일 수 있으므로 일괄 결측 처리하지 않는다.
 
@@ -45,7 +41,6 @@ QUOTE_DRAFT_CONFIG_ID=1
 | 정상 견적 | 품목 3개, 공급가액 500000, 세액 50000, 총액 550000 추출 |
 | 오류 견적 / 추출 v3 | 품목 3개 보존, 수량 미기재를 빈값으로 유지. 원문 190000 보존. 수량×단가 200000과의 차이 및 품목 합계 490000/공급가액 500000 불일치 경고 |
 | 비교 / v1 | A/B를 조건부 비교, 단가 차이 -2000 및 -8% 표시. 수량·결제·운송 조건 차이 명시. 규격·단위·통화가 다른 C 제외 |
-| 초안 / v1 | 수량 12, 단가 24000 반영. 미정 견적번호·유효기간·납기를 질문. `needs_input` 반환 |
 
 `results/`의 CSV는 Studio UI에서 내려받은 실제 샘플 결과다. 이후 같은 가상 PDF로 외부 API 3개 호출과 로컬 HTTP 서버 통합 흐름을 검증했다. 실호출 결과는 Git 제외 경로 `../.runtime/live-agent-check/`에 있다. 실제 다양한 기업 양식·스캔/OCR·프론트 UI 통합은 검증하지 않았다. 일부 테스트 문서에는 검증 메모가 포함되므로 실제 정확도 평가 자료로는 사용할 수 없다.
 
@@ -55,7 +50,7 @@ QUOTE_DRAFT_CONFIG_ID=1
 2. Files API 업로드 → Responses 작업 생성 → 상태 폴링 → JSON 검증을 연결했다. 기준 주소는 `https://api.upstage.ai/v2`다. 타임아웃·실패·명시적 재시도와 임시 파일 정리를 지원한다.
 3. 추출 원문/결과/검토 경고를 저장하고 사용자 수정·확정을 연결했다.
 4. 선택한 DB 견적을 비교 입력 PDF로 조립한다. AI 비교와 별도로 Decimal 검산 결과를 제공한다.
-5. 사용자 확정 변경에 따른 초안 저장·Decimal 계산·지정 양식 Excel/PDF 출력을 구현했다. AI 초안 제안은 사용자 확정 전에 자동 저장하지 않는다.
+5. 저장된 견적의 지정 양식 Excel/PDF 사본 출력은 유지한다.
 
 ## 설정 재사용 및 샘플 재생성
 

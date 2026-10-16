@@ -9,10 +9,10 @@ from sqlalchemy.exc import IntegrityError
 
 from .database import Job, Quote, now, uid
 from .documents import DocumentError, agent_input, local_extract, make_pdf, read_document, validate_file
-from .domain import calculate_draft, compare_quotes, parse_json_field
+from .domain import compare_quotes, parse_json_field
 from .extraction import normalize_result
-from .repository import check_version, clean_fields, detail, ensure_idle, record, require, set_fields
-from .schemas import DraftRequest, QuoteFields
+from .repository import detail, ensure_idle, record, require, set_fields
+from .schemas import QuoteFields
 from .upstage import AgentError, UpstageClient
 
 
@@ -65,7 +65,7 @@ class Service:
             temporary.unlink(missing_ok=True)
 
     def source(self, quote):
-        if quote.kind == "draft" and quote.source_quote_id:
+        if quote.source_quote_id:
             with self.db.sessions() as session:
                 original = require(session, quote.source_quote_id)
                 return self.source(original)
@@ -91,7 +91,7 @@ class Service:
             q = require(session, request.quote_id)
             ensure_idle(q)
             if q.kind != "archive":
-                raise HTTPException(409, "초안에는 문서 재추출을 실행할 수 없습니다.")
+                raise HTTPException(409, "원본 등록 견적에만 문서 추출을 실행할 수 있습니다.")
             has_data = bool(q.items) or any(v is not None and v != "" for k, v in q.payload.items() if k not in ("raw_fields", "review_note"))
             if (q.extraction_status == "completed" or has_data) and not request.force:
                 raise HTTPException(409, "추출·검토 값이 있습니다. 덮어쓸 재추출은 force=true로 명시하세요.")
@@ -159,39 +159,9 @@ class Service:
                 q.status, q.extraction_status, q.updated_at = "review_required", "failed", now()
                 record(session, q, "extraction_failed")
 
-    def create_draft(self, quote_id, request: DraftRequest):
-        with self.db.sessions.begin() as session:
-            source = require(session, quote_id)
-            ensure_idle(source)
-            check_version(source, request.overrides.expected_version)
-            fields = clean_fields(source)
-            original_fields = copy.deepcopy(fields)
-            changes = request.overrides.model_dump(mode="json", exclude_unset=True, exclude={"expected_version"})
-            fields.update(changes)
-            fields["items"] = fields.get("items") or []
-            fields["raw_fields"] = fields.get("raw_fields") or {}
-            if "quote_number" not in changes:
-                fields["quote_number"] = None
-            if "issue_date" not in changes:
-                fields["issue_date"] = None
-            for key in ("valid_until", "delivery_date"):
-                if key not in changes:
-                    fields[key] = None
-            fields = calculate_draft(fields, request.tax_rate, request.tax_basis)
-            draft = Quote(id=uid(), kind="draft", source_quote_id=source.id, extraction_status="not_applicable")
-            set_fields(draft, fields)
-            session.add(draft)
-            draft.extraction_raw = {"source_snapshot": original_fields, "source_version": source.version, "changes": changes}
-            record(session, draft, "draft_created")
-            return detail(draft)
-
     def start_agent(self, request):
         if len(set(request.quote_ids)) != len(request.quote_ids):
             raise HTTPException(422, "견적 ID가 중복되었습니다.")
-        if request.kind == "compare" and len(request.quote_ids) < 2:
-            raise HTTPException(422, "비교에는 견적이 2개 이상 필요합니다.")
-        if request.kind == "draft" and len(request.quote_ids) != 1:
-            raise HTTPException(422, "초안에는 원본 견적 1개가 필요합니다.")
         if not self.config.upstage_api_key.get_secret_value():
             raise HTTPException(503, "Upstage API 키가 필요합니다.")
         with self.db.sessions.begin() as session:
@@ -200,7 +170,7 @@ class Service:
                 q = require(session, identifier)
                 ensure_idle(q)
                 snapshots.append(detail(q))
-            job = Job(id=uid(), quote_id=request.quote_ids[0], kind=request.kind, provider="upstage", result={"input": snapshots, "draft_request": request.draft_request.model_dump(mode="json") if request.draft_request else None})
+            job = Job(id=uid(), quote_id=request.quote_ids[0], kind=request.kind, provider="upstage", result={"input": snapshots})
             session.add(job)
             session.flush()
             return self.job_data(job)
@@ -213,28 +183,18 @@ class Service:
                     return
                 job.status, job.updated_at = "running", now()
                 payload, kind = copy.deepcopy(job.result), job.kind
-            pdf = agent_input(f"QuoteFlow {kind} 입력 - 저장된 견적과 사용자 지정 변경", payload, self.config.pdf_font_path)
-            agent_id = getattr(self.config, f"quote_{kind}_agent_id")
-            config_id = getattr(self.config, f"quote_{kind}_config_id")
-            remote = self.agent.run(pdf, agent_id, config_id)
+            if kind != "compare":
+                raise AgentError("지원하지 않는 에이전트 작업입니다.")
+            pdf = agent_input(f"QuoteFlow {kind} 입력 - 저장된 견적 비교", payload, self.config.pdf_font_path)
+            remote = self.agent.run(pdf, self.config.quote_compare_agent_id, self.config.quote_compare_config_id)
             result = remote["data"]
-            if kind == "compare":
-                if result.get("comparison_status") not in ("comparable", "conditional", "insufficient_data"):
-                    raise AgentError("비교 에이전트의 상태 값이 올바르지 않습니다.")
-                for key in ("comparison_rows_json", "comparable_pairs_json", "excluded_rows_json"):
-                    result[key.removesuffix("_json")] = parse_json_field(result.get(key), [])
-                    if not isinstance(result[key.removesuffix("_json")], list):
-                        raise AgentError("비교 에이전트의 배열 형식이 올바르지 않습니다.")
-                result["verified_comparison"] = compare_quotes(payload["input"])
-            else:
-                if result.get("draft_status") not in ("needs_input", "needs_review"):
-                    raise AgentError("초안 에이전트의 상태 값이 올바르지 않습니다.")
-                for key, default in (("draft_items_json", []), ("terms_json", {}), ("changes_json", [])):
-                    parsed = parse_json_field(result.get(key), default)
-                    if not isinstance(parsed, type(default)):
-                        raise AgentError("초안 에이전트의 결과 형식이 올바르지 않습니다.")
-                    result[key.removesuffix("_json")] = parsed
-                result["notice"] = "AI 제안입니다. 사용자 확정 후 원본 복사 API로 초안을 생성하세요."
+            if result.get("comparison_status") not in ("comparable", "conditional", "insufficient_data"):
+                raise AgentError("비교 에이전트의 상태 값이 올바르지 않습니다.")
+            for key in ("comparison_rows_json", "comparable_pairs_json", "excluded_rows_json"):
+                result[key.removesuffix("_json")] = parse_json_field(result.get(key), [])
+                if not isinstance(result[key.removesuffix("_json")], list):
+                    raise AgentError("비교 에이전트의 배열 형식이 올바르지 않습니다.")
+            result["verified_comparison"] = compare_quotes(payload["input"])
             with self.db.sessions.begin() as session:
                 job = session.get(Job, job_id)
                 job.status, job.result, job.updated_at = "completed", {**remote, "data": result}, now()

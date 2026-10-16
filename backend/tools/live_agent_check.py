@@ -17,7 +17,7 @@ from app.upstage import UpstageClient
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--live", action="store_true", help="Authorize the three synthetic-document API calls")
+    parser.add_argument("--live", action="store_true", help="Authorize the two synthetic-document API calls")
     parser.add_argument("--api", action="store_true", help="Run the full PDF workflow through the local API instead")
     parser.add_argument("--xlsx", action="store_true", help="Use a synthetic XLSX for the local HTTP flow")
     args = parser.parse_args()
@@ -58,26 +58,25 @@ def main():
             assert job["status"] == "completed", job.get("error", "timeout")
             q = api.get("/api/quotes/"+q["quote_id"]).json()
             assert q["items"][2]["quantity"] is None
-            item = {k:v for k,v in q["items"][0].items() if k not in ("item_id", "line_number")}
-            item.update(quantity="12", unit_price="24000")
-            response = api.post(f"/api/quotes/{q['quote_id']}/drafts", json={"overrides": {"items": [item], "issue_date": "2026-10-16"}, "tax_rate": "10", "tax_basis": "exclusive"})
-            response.raise_for_status()
-            draft = response.json()
-            assert draft["total_amount"] == "316800.0000"
-            comparison = api.post("/api/compare", json={"quote_ids": [q["quote_id"], draft["quote_id"]]}).json()
-            assert comparison["pairs"]
-            for fmt in ("pdf", "xlsx"):
-                response = api.get(f"/api/quotes/{draft['quote_id']}/export", params={"format": fmt})
+            comparison = None
+            cards = api.get("/api/cards", params={"kind": "archive"}).json()["items"]
+            other = next((row for row in cards if row["quote_id"] != q["quote_id"]), None)
+            if other:
+                response = api.post("/api/compare", json={"quote_ids": [q["quote_id"], other["quote_id"]]})
                 response.raise_for_status()
-                (output/f"api-draft.{fmt}").write_bytes(response.content)
-            encoded = json.dumps({"quote": q, "draft": draft, "comparison": comparison, "job": job}, ensure_ascii=False, indent=2)
+                comparison = response.json()
+            for fmt in ("pdf", "xlsx"):
+                response = api.get(f"/api/quotes/{q['quote_id']}/export", params={"format": fmt})
+                response.raise_for_status()
+                (output/f"api-quote.{fmt}").write_bytes(response.content)
+            encoded = json.dumps({"quote": q, "comparison": comparison, "job": job}, ensure_ascii=False, indent=2)
             (output/"api-workflow.json").write_text(encoded, encoding="utf-8")
             (output/f"api-workflow-{'xlsx' if args.xlsx else 'pdf'}.json").write_text(encoded, encoding="utf-8")
-            print(f"Local HTTP API ({filename}): upload, live extraction, draft, comparison, PDF/XLSX export passed.", flush=True)
+            print(f"Local HTTP API ({filename}): upload, live extraction and PDF/XLSX export passed.", flush=True)
         return
     client = UpstageClient(settings)
     checks = []
-    for kind, filename in (("extract", "quote_review.pdf"), ("compare", "input_comparison.pdf"), ("draft", "input_draft.pdf")):
+    for kind, filename in (("extract", "quote_review.pdf"), ("compare", "input_comparison.pdf")):
         print(f"Running {kind} with fictional sample...", flush=True)
         result = client.run((samples/filename).read_bytes(), getattr(settings, f"quote_{kind}_agent_id"), getattr(settings, f"quote_{kind}_config_id"))
         (output/f"{kind}.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -91,14 +90,10 @@ def main():
         elif kind == "compare":
             assert data["comparison_status"] == "conditional"
             assert json.loads(data["excluded_rows_json"])[0]["quote_id"] == "DEMO-C"
-        else:
-            assert data["draft_status"] == "needs_input"
-            row = json.loads(data["draft_items_json"])[0]
-            assert row["quantity"] == "12" and row["unit_price"] == "24000"
         checks.append({"kind": kind, "passed": True, "remote_job_id": result["remote_job_id"], "input_file_deleted": result.get("input_file_deleted")})
         print(f"{kind}: passed; temporary remote file deleted={result.get('input_file_deleted')}", flush=True)
     (output/"summary.json").write_text(json.dumps(checks, indent=2), encoding="utf-8")
-    print("All 3 live checks passed.")
+    print("All 2 live checks passed.")
 
 
 if __name__ == "__main__":

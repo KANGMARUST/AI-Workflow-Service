@@ -6,9 +6,9 @@ from sqlalchemy import select
 
 from .database import Job, Quote, Revision, now
 from .documents import quote_pdf, quote_xlsx
-from .domain import calculate_draft, compare_quotes
+from .domain import compare_quotes
 from .repository import check_version, clean_fields, detail, ensure_idle, record, require, search, set_fields
-from .schemas import AgentRequest, CompareRequest, DraftRequest, ExtractionRequest, QuoteEditRequest, QuoteListResponse, QuoteSearchRequest, QuoteStatus, QuoteStatusRequest
+from .schemas import AgentRequest, CompareRequest, ExtractionRequest, QuoteEditRequest, QuoteListResponse, QuoteSearchRequest, QuoteStatus, QuoteStatusRequest
 
 router = APIRouter()
 
@@ -96,8 +96,6 @@ def edit_quote(request: Request, quote_id: str, payload: QuoteEditRequest):
             data = clean_fields(q)
             data.update(changes)
             data["items"], data["raw_fields"] = data.get("items") or [], data.get("raw_fields") or {}
-            if q.kind == "draft":
-                data = calculate_draft(data)
             set_fields(q, data)
             q.status = "review_required"
             record(session, q, "edit")
@@ -192,11 +190,6 @@ def compare(request: Request, payload: CompareRequest):
         return compare_quotes(quotes, payload.item_name)
 
 
-@router.post("/quotes/{quote_id}/drafts", status_code=201, summary="과거 견적을 복사해 새 초안 생성")
-def draft(request: Request, quote_id: str, payload: DraftRequest):
-    return svc(request).create_draft(quote_id, payload)
-
-
 @router.get("/quotes/{quote_id}/export", summary="지정 양식 PDF·Excel 출력")
 def export(request: Request, quote_id: str, format: Literal["pdf", "xlsx"] = "pdf"):
     service = svc(request)
@@ -209,7 +202,7 @@ def export(request: Request, quote_id: str, format: Literal["pdf", "xlsx"] = "pd
     return Response(content, media_type=media, headers={"Content-Disposition": f'attachment; filename="quote-{quote_id}.{format}"', "X-Content-Type-Options": "nosniff"})
 
 
-@router.post("/agent-runs", status_code=202, summary="Studio 비교·초안 제안 작업")
+@router.post("/agent-runs", status_code=202, summary="Studio 비교 작업")
 def agent_run(request: Request, payload: AgentRequest, background: BackgroundTasks):
     service = svc(request)
     result = service.start_agent(payload)
@@ -221,7 +214,7 @@ def agent_run(request: Request, payload: AgentRequest, background: BackgroundTas
 def stats(request: Request):
     with svc(request).db.sessions() as session:
         quotes = session.scalars(select(Quote).where(Quote.deleted_at.is_(None))).all()
-        return {"document_count": sum(q.kind == "archive" for q in quotes), "draft_count": sum(q.kind == "draft" for q in quotes), "review_required_count": sum(q.status == "review_required" for q in quotes), "confirmed_count": sum(q.status == "confirmed" for q in quotes), "customer_count": len({q.payload.get("customer_name") for q in quotes if q.payload.get("customer_name")}), "item_count": sum(len(q.items) for q in quotes)}
+        return {"document_count": sum(q.kind == "archive" for q in quotes), "review_required_count": sum(q.status == "review_required" for q in quotes), "confirmed_count": sum(q.status == "confirmed" for q in quotes), "customer_count": len({q.payload.get("customer_name") for q in quotes if q.payload.get("customer_name")}), "item_count": sum(len(q.items) for q in quotes)}
 
 
 @router.get("/capabilities", summary="프론트 연결용 지원 기능·설정 상태")

@@ -2,6 +2,8 @@
 
 FastAPI 기반 견적 아카이브 API. 루트 `backend/`만 사용하며 `project/`는 사용하지 않는다. 프론트 없이 Swagger 또는 HTTP 요청으로 전체 흐름을 실행할 수 있다.
 
+기능별 동작, 전체 API, 데이터 필드, 프론트 연결 순서와 구현 한계는 [백엔드 기능 상세 안내](FEATURES.md)를 참고한다.
+
 ## 실행
 
 저장소 루트의 PowerShell:
@@ -44,7 +46,6 @@ docker compose -f backend/docker-compose.yml up --build
 | `EXTRACTION_PROVIDER` | auto / local / upstage. auto는 키가 있으면 Studio, 없으면 로컬 |
 | `QUOTE_EXTRACT_AGENT_ID`, `QUOTE_EXTRACT_CONFIG_ID` | 추출 에이전트·설정 버전 |
 | `QUOTE_COMPARE_AGENT_ID`, `QUOTE_COMPARE_CONFIG_ID` | 비교 에이전트·설정 버전 |
-| `QUOTE_DRAFT_AGENT_ID`, `QUOTE_DRAFT_CONFIG_ID` | 초안 제안 에이전트·설정 버전 |
 | `AGENT_TIMEOUT_SECONDS` | 외부 작업 제한 시간. 기본 180초 |
 | `CORS_ORIGINS` | 쉼표로 구분한 프론트 주소. 기본 localhost/127.0.0.1:5173 |
 | `API_TOKEN` | 선택적 공유 Bearer 토큰. `APP_ENV=production`에서는 필수 |
@@ -58,7 +59,7 @@ SQL에는 RLS 활성화가 포함되며 익명 정책은 만들지 않는다. �
 
 ## 프론트 담당자 연결 순서
 
-기존 `/add`, `/extract`, `/search`, `/cards`, `/edit/{quote_id}`, `/status/{quote_id}` 경로는 유지했다. 등록 직후 자동으로 추출하지 않는다. 상세·작업·원본·비교·초안 API가 추가됐다. 루트 `docs/api-contract.md`는 초기 초안이므로 **현재 계약은 이 문서와 실행 중인 OpenAPI를 따른다.**
+기존 `/add`, `/extract`, `/search`, `/cards`, `/edit/{quote_id}`, `/status/{quote_id}` 경로는 유지했다. 등록 직후 자동으로 추출하지 않는다. 상세·작업·원본·비교 API가 추가됐다. 루트 `docs/api-contract.md`는 초기 초안이므로 **현재 계약은 이 문서와 실행 중인 OpenAPI를 따른다.**
 
 | 순서 | 요청 | 결과 |
 |---|---|---|
@@ -71,8 +72,7 @@ SQL에는 RLS 활성화가 포함되며 익명 정책은 만들지 않는다. �
 | 7 | `GET /api/cards` 또는 `POST /api/search` | 목록 `{items,total,limit,offset}` |
 | 8 | `GET /api/items/history?keyword=센서` | 품목별 단가·거래조건 이력 |
 | 9 | `POST /api/compare` | 선택한 견적의 조건별 단가 비교 |
-| 10 | `POST /api/quotes/{quote_id}/drafts` | 원본 복사·수량/단가 수정·새 초안 저장 |
-| 11 | `GET /api/quotes/{draft_id}/export?format=xlsx` | 지정 양식 파일. pdf도 지원 |
+| 10 | `GET /api/quotes/{quote_id}/export?format=xlsx` | 지정 양식 파일. pdf도 지원 |
 
 ### 업로드와 추출
 
@@ -124,37 +124,17 @@ PATCH 미전달 필드는 유지하고 명시적인 null은 지운다. `items`�
 {"keyword":"센서","customer_name":"가상제조사","item_name":"센서","date_from":"2026-01-01","date_to":"2026-12-31","amount_min":"100000","amount_max":"1000000","status":"confirmed","limit":20,"offset":0}
 ```
 
-POST `/api/search`의 모든 조건은 선택적이다. GET `/api/search`는 keyword가 필수다. `/cards`는 status, kind(archive/draft), limit, offset 필터를 받는다. 상세 검색에는 contact_name, kind도 사용할 수 있다. 기본 limit 20, 최대 100. 검색은 현재 MVP에서 DB의 활성 문서를 읽어 Python의 문자열·Decimal로 필터링한다. 대규모 데이터에는 DB 검색 인덱스·전용 필드로 이전해야 한다.
+POST `/api/search`의 모든 조건은 선택적이다. GET `/api/search`는 keyword가 필수다. `/cards`는 status, kind(신규 등록은 archive, 과거 draft 값은 조회 호환용), limit, offset 필터를 받는다. 상세 검색에는 contact_name, kind도 사용할 수 있다. 기본 limit 20, 최대 100. 검색은 현재 MVP에서 DB의 활성 문서를 읽어 Python의 문자열·Decimal로 필터링한다. 대규모 데이터에는 DB 검색 인덱스·전용 필드로 이전해야 한다.
 
 POST `/api/compare` 본문: `{"quote_ids":["id-a","id-b"],"item_name":"센서"}`. 동일 품목명·규격·단위·통화가 명시된 행만 비교한다. 결과 `pairs`의 차액은 후자-전자, 비율은 전자 단가 기준이며 전자 단가 0이면 null. 수량·날짜·세금·할인·납품·결제조건 차이와 미기재 조건을 함께 보여준다. 다른 규격·통화 또는 정보 부족은 `excluded_rows`에 표시한다. 환율·단위 변환은 추정하지 않는다.
 
-`GET /api/stats`는 문서·초안·검토·거래처·품목 수만 반환한다. 실제 수주율·매출 통계는 생성하지 않는다.
+`GET /api/stats`는 문서·검토·거래처·품목 수만 반환한다. 실제 수주율·매출 통계는 생성하지 않는다.
 
-### 새 견적 초안과 출력
-
-POST `/api/quotes/{source_id}/drafts`:
-
-```json
-{
-  "overrides": {
-    "issue_date": "2026-10-16",
-    "items": [{"item_name":"센서","specification":"TS-100","unit":"개","quantity":"12","unit_price":"24000","currency":"KRW"}]
-  },
-  "tax_rate": "10",
-  "tax_basis": "exclusive"
-}
-```
-
-원본을 변경하지 않고 별도 draft를 저장하며 원본 ID·버전·스냅샷을 연결한다. 새 견적번호·작성일·유효기간·납기는 입력하지 않으면 비운다. 사용자가 확정한 단가·수량만 적용한다. 새 초안 품목 금액은 수량×단가로 계산한다.
-
-- `tax_basis=exclusive`: 단가가 세금 별도. 공급가액=품목 합계, 세액=공급가액×세율, 총액=공급가액+세액.
-- `tax_basis=inclusive`: 단가가 세금 포함. 총액=품목 합계, 공급가액=총액÷(1+세율), 세액=차액.
-- 세율·기준 미정, 서로 다른 통화, 자동 적용할 수 없는 할인 조건이면 최종 금액은 null이다. 관행상 세율 10%를 채우지 않는다.
-- 반올림은 소수 4자리 ROUND_HALF_UP. 실제 발행 전 회사의 통화·세금 반올림 정책을 확인해야 한다.
+### 저장된 견적 출력
 
 출력은 `GET /api/quotes/{id}/export?format=pdf` 또는 xlsx. 현재 지정 양식은 1개다. Excel은 숫자 정밀도 보존을 위해 금액·수량을 문자열로 저장하며 수식 자동 재계산은 제공하지 않는다. 사용자 입력이 Excel 수식으로 실행되지 않게 저장한다. 원본 미기재 값은 출력에서도 미기재로 표시한다.
 
-### 선택적 Studio 비교·초안 제안
+### 선택적 Studio 비교 설명
 
 POST `/api/agent-runs`:
 
@@ -162,7 +142,7 @@ POST `/api/agent-runs`:
 {"kind":"compare","quote_ids":["id-a","id-b"]}
 ```
 
-또는 `{"kind":"draft","quote_ids":["source-id"],"draft_request":{"overrides":{"items":[...]},"tax_rate":"10","tax_basis":"exclusive"}}`. 반환된 작업은 `/api/jobs/{id}`에서 조회한다. 비교에는 최소 2건, 초안에는 1건만 사용한다. 최대 5건이다.
+반환된 작업은 `/api/jobs/{id}`에서 조회한다. 서로 다른 견적 2~5건을 사용한다.
 
 백엔드가 저장된 견적을 PDF로 조립해 Studio에 전달한다. AI 결과는 제안이며 저장·확정·출력을 자동 실행하지 않는다. 비교 결과의 `verified_comparison`은 백엔드가 Decimal로 별도 계산한 결과다. 외부 임시 입력 파일은 작업 후 삭제를 시도하고 `input_file_deleted`로 성공 여부를 남긴다.
 
@@ -183,9 +163,9 @@ cd backend
 uv pip check --python .venv/Scripts/python.exe
 ```
 
-현재 자동 테스트 35개: 정상·오류 입력, XLSX/PDF 추출, 누락/0 구분, 원문 금액 보존, 영속성, 버전 충돌, 원본 다운로드, 휴지통, 검색 범위, 비교 제외, 세금·할인, 소수 정밀도, 초안 출력, 인증·CORS, 재시작 작업 복구, 외부 오류·제한시간·파일 정리와 에이전트 결과 검증.
+초안 기능 제거 후 자동 테스트는 파일 등록·추출·검토·검색·비교·출력, 오류 처리와 제거된 API 차단을 검증한다. 기존 SQLite 데이터는 보존하며 DB 스키마를 파괴적으로 변경하지 않는다. 과거 draft 데이터의 조회 호환을 위해 종류·원본 연결 필드는 남겨두지만 새 초안 생성이나 AI 초안 제안은 제공하지 않는다.
 
-사용자가 제공한 키로 실제 Studio 추출·비교·초안 호출 3개를 가상 PDF로 확인했고, 실제 로컬 HTTP 서버에서도 업로드→Studio 추출→비교→초안 생성→PDF/XLSX 출력을 확인했다. 임시 외부 파일 삭제도 성공했다. 결과는 `.runtime/live-agent-check/`에 있으며 비밀키는 포함하지 않는다.
+이전 가상 문서 기반 Studio 추출·비교 실연결 기록은 `.runtime/live-agent-check/`에 있다. 이번 제거 작업에서는 외부 API를 다시 호출하지 않는다.
 
 실연결 테스트는 명시적으로 실행한다(가상 PDF 업로드 및 API 사용량 발생):
 
@@ -204,7 +184,7 @@ Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증
 - `app/routes.py`: API, `schemas.py`: 요청·응답 계약
 - `app/database.py`, `repository.py`: DB·트랜잭션·이력
 - `app/documents.py`, `extraction.py`: 파일 검사·파싱·정규화·출력
-- `app/domain.py`: 정합성 검사·비교·초안 Decimal 계산
+- `app/domain.py`: 정합성 검사·비교 Decimal 계산
 - `app/service.py`, `upstage.py`: 작업 실행·외부 API
 - `agent_configs/`: 실제 Studio 설정 JSON·가상 샘플·사용 가이드
 - `supabase/schema.sql`: 빈 PostgreSQL용 초기 DDL, `tools/export_schema.py`: 재생성
