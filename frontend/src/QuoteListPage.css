@@ -1,0 +1,38 @@
+/* QuoteListPage page styles: isolated from the other pages. */
+
+
+.all-quotes-page{min-height:calc(100vh - 150px)}
+.all-quotes-page .all-quotes-panel{overflow:visible;background:transparent;border:0;border-radius:0;box-shadow:none}
+.all-quotes-page .all-quotes-toolbar{padding:20px 0;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid #dce3ed}
+.all-quotes-page .list-count{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.all-quotes-page .list-count b{font-size:16px;color:#263a56}
+.all-quotes-page .list-count span{font-size:13px;color:#73839a}
+.all-quotes-page .list-filters{display:flex;align-items:center;gap:10px;min-width:0}
+.all-quotes-page .list-register-button{height:42px;flex:0 0 auto;padding:0 16px;white-space:nowrap}
+.all-quotes-page .list-search{width:min(370px,32vw);height:42px}
+.all-quotes-page .list-search{background:#fff}
+.all-quotes-page .list-search input{font-size:13px}
+.all-quotes-page .status-filter{height:42px;min-width:155px;padding:0 11px;display:flex;align-items:center;gap:8px;border:1px solid #e2e7ee;border-radius:8px;color:#728199;background:#fff}
+.all-quotes-page .status-filter>svg:first-child{width:16px;height:16px}
+.all-quotes-page .status-filter>svg:last-child{width:14px;height:14px;margin-left:auto}
+.all-quotes-page .status-filter select{width:100%;border:0;outline:0;appearance:none;background:transparent;color:#4b5e77;font-size:13px}
+.all-quotes-page .all-quotes-table{table-layout:auto}
+.all-quotes-page .all-quotes-table thead{background:#fff}
+.all-quotes-page .all-quotes-table th:first-child,.all-quotes-page .all-quotes-table td:first-child{padding-left:26px}
+.all-quotes-page .all-quotes-table td{height:74px}
+.all-quotes-page .quote-subtitle{display:block;max-width:260px;margin-top:5px;color:#8693a5;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.all-quotes-page .api-error{margin:16px 0 0;padding:13px 15px;display:flex;align-items:center;gap:12px;border:1px solid #f0d8d5;border-radius:9px;background:#fff8f7;color:#8f4d43;font-size:12px}
+.all-quotes-page .api-error b{white-space:nowrap}
+.all-quotes-page .api-error span{overflow:hidden;text-overflow:ellipsis}
+.all-quotes-page .api-error button{margin-left:auto;border:1px solid #e4c7c3;border-radius:7px;background:white;color:#85483f;padding:7px 10px;white-space:nowrap;font-size:12px}
+.all-quotes-page .list-state{min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#8391a5;font-size:14px}
+.all-quotes-page .list-state>svg{width:25px;height:25px;color:#8293aa}
+.all-quotes-page .list-state .spin{animation:spin 1s linear infinite}
+.all-quotes-page .pagination{min-height:68px;padding:0;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #dce3ed;color:#77869b;font-size:12px}
+.all-quotes-page .pagination>div{display:flex;align-items:center;gap:8px}
+.all-quotes-page .pagination button{width:34px;height:34px;display:grid;place-items:center;border:1px solid #e0e6ee;border-radius:8px;background:#fff;color:#4c607a}
+.all-quotes-page .pagination button:disabled{color:#b5bfcc;background:#f8f9fb;cursor:not-allowed}
+.all-quotes-page .pagination button svg{width:17px;height:17px}
+.all-quotes-page .page-indicator{min-width:56px;text-align:center;color:#415773}
+@media(max-width:900px){.all-quotes-page .all-quotes-toolbar{align-items:flex-start;flex-direction:column;padding:17px 0}.all-quotes-page .list-filters{width:100%}.all-quotes-page .list-search{width:auto;flex:1}.all-quotes-page .status-filter{min-width:145px}.all-quotes-page .all-quotes-table td{height:66px}.all-quotes-page .quote-subtitle{max-width:190px}.all-quotes-page .api-error{flex-wrap:wrap}.all-quotes-page .api-error b{white-space:normal}}
+@media(max-width:600px){.all-quotes-page .all-quotes-toolbar{gap:13px;padding:14px 0}.all-quotes-page .list-count b{font-size:14px}.all-quotes-page .list-filters{gap:7px;flex-wrap:wrap}.all-quotes-page .list-search{height:38px;min-width:0;flex:1 1 100%}.all-quotes-page .list-search input{font-size:11px}.all-quotes-page .status-filter{height:38px;min-width:118px;padding:0 8px;gap:5px;flex:1}.all-quotes-page .status-filter select{font-size:11px}.all-quotes-page .list-register-button{height:38px;padding:0 10px;font-size:11px}.all-quotes-page .all-quotes-table .check-col{width:38px}.all-quotes-page .all-quotes-table th:first-child,.all-quotes-page .all-quotes-table td:first-child{padding-left:12px}.all-quotes-page .all-quotes-table th{font-size:10px}.all-quotes-page .all-quotes-table td{height:62px;font-size:11px}.all-quotes-page .all-quotes-table th,.all-quotes-page .all-quotes-table td{padding-inline:7px}.all-quotes-page .all-quotes-table .quote-id,.all-quotes-page .all-quotes-table .client-name{font-size:11px}.all-quotes-page .quote-subtitle{max-width:120px;font-size:9px}.all-quotes-page .all-quotes-table .status-pill{min-width:74px;font-size:9px;padding:0 6px}.all-quotes-page .all-quotes-table .amount-cell{font-size:10px}.all-quotes-page .pagination{min-height:58px}.all-quotes-page .pagination button{width:30px;height:30px}.all-quotes-page .api-error span{flex-basis:100%}}
