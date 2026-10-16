@@ -1,4 +1,6 @@
-.quote-review-dialog{width:min(1100px,calc(100% - 32px));max-height:90dvh;padding:0;border:1px solid #dce3ed;border-radius:16px;color:#263a56;background:#fff;box-shadow:0 24px 80px #172f4f30;overflow:auto}
+.quote-review-dialog{position:fixed;inset:0 0 0 auto;margin:0;width:min(50vw,900px);height:100dvh;max-height:100dvh;padding:0;border:1px solid #dce3ed;border-right:0;border-radius:16px 0 0 16px;color:#263a56;background:#fff;box-shadow:-18px 0 60px #172f4f24;overflow:auto}
+.quote-review-dialog[open]{animation:quote-review-slide-in .22s ease-out both}
+@keyframes quote-review-slide-in{from{transform:translateX(32px);opacity:.8}to{transform:translateX(0);opacity:1}}
 .quote-review-dialog::backdrop{background:#172b4666}
 .quote-review-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:24px 28px;border-bottom:1px solid #e5eaf1}
 .quote-review-eyebrow{font-size:11px;font-weight:700;letter-spacing:1.4px;color:#6e83a0}
@@ -26,5 +28,6 @@
 .quote-review-error{margin:16px 28px 0;padding:14px;display:flex;flex-wrap:wrap;gap:10px;border:1px solid #f0d8d5;border-radius:9px;background:#fff8f7;color:#8f4d43;font-size:13px;overflow-wrap:anywhere}.quote-review-error button{background:#fff;border:1px solid #e4c7c3;border-radius:6px;padding:7px;color:inherit}
 .quote-review-success{display:flex;align-items:center;gap:8px;color:#23704c;background:#f0faf4;padding:14px;border-radius:8px;margin:0;font-size:14px}
 .quote-review-hint{color:#75849a;font-size:13px}.quote-review-state{min-height:250px;display:flex;align-items:center;justify-content:center;gap:12px;color:#75849a}
-@media(max-width:750px){.quote-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quote-review-footer{align-items:stretch;flex-direction:column}.quote-review-footer>div{justify-content:flex-end}}
-@media(max-width:480px){.quote-review-dialog{width:calc(100% - 16px);max-height:95dvh;border-radius:12px}.quote-review-heading,.quote-review-body{padding:18px 14px}.quote-review-heading h2{font-size:21px}.quote-review-grid{grid-template-columns:1fr}.quote-review-dialog fieldset{padding:14px 10px}.quote-review-footer{padding:14px}.quote-review-footer>div{flex-wrap:wrap}.quote-review-dialog .secondary-button,.quote-review-dialog .primary-button{padding:9px 11px;font-size:12px}.quote-review-error{margin:14px}.quote-review-dialog legend small{display:block;margin-top:4px}}
+@media(max-width:750px){.quote-review-dialog{width:min(78vw,650px)}.quote-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quote-review-footer{align-items:stretch;flex-direction:column}.quote-review-footer>div{justify-content:flex-end}}
+@media(max-width:480px){.quote-review-dialog{width:100vw;border-radius:0}.quote-review-heading,.quote-review-body{padding:18px 14px}.quote-review-heading h2{font-size:21px}.quote-review-grid{grid-template-columns:1fr}.quote-review-dialog fieldset{padding:14px 10px}.quote-review-footer{padding:14px}.quote-review-footer>div{flex-wrap:wrap}.quote-review-dialog .secondary-button,.quote-review-dialog .primary-button{padding:9px 11px;font-size:12px}.quote-review-error{margin:14px}.quote-review-dialog legend small{display:block;margin-top:4px}}
+@media(prefers-reduced-motion:reduce){.quote-review-dialog[open]{animation:none}}

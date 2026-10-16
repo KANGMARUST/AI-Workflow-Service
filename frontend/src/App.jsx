@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart3, Box, Check, ChevronDown, FileText, Home, LoaderCircle, Plus, UploadCloud, UserRound, X } from 'lucide-react';
 import PriceComparison from './PriceComparison.jsx';
 import Customers from './Customers.jsx';
 import Items from './Items.jsx';
 import HomePage from './HomePage.jsx';
 import QuoteListPage from './QuoteListPage.jsx';
+import { requestQuote } from './quoteApi.js';
+import SettingsPage from './SettingsPage.jsx';
 
 const apiPrefixRaw = (import.meta.env.VITE_API_PREFIX || '/api').replace(/\/$/, '');
 const API_PREFIX = apiPrefixRaw.startsWith('/') ? apiPrefixRaw : `/${apiPrefixRaw}`;
@@ -24,37 +26,68 @@ async function requestApi(path, options = {}) {
 
 const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
-const seed = [
-  { id: 'Q-2026-00148', client: '㈜한빛테크', date: '2026. 10. 14', amount: 12500000, status: '검토 미완료', title: '산업용 센서 모듈 공급 견적' },
-  { id: 'Q-2026-00147', client: '삼성전자㈜', date: '2026. 10. 13', amount: 5300000, status: '검토 완료', title: '자동화 설비 부품 견적서' },
-  { id: 'Q-2026-00146', client: '㈜미래솔루션', date: '2026. 10. 11', amount: 8750000, status: '검토 완료', title: '컨트롤 패널 및 부속품' },
-  { id: 'Q-2026-00145', client: 'LG디스플레이㈜', date: '2026. 10. 09', amount: 21000000, status: '검토 미완료', title: '디스플레이 부품 공급 견적' },
-  { id: 'Q-2026-00144', client: '㈜현대엔지니어링', date: '2026. 10. 06', amount: 4200000, status: '검토 완료', title: '정밀 가공 부품 단가 제안' },
-];
+const quoteStatus = { review_required: '검토 미완료', extracting: '추출 중', confirmed: '검토 완료', rejected: '반려', archived: '보관' };
+const homeQuote = (quote) => ({
+  id: quote.quote_number || quote.quote_id,
+  quoteId: quote.quote_id,
+  backendQuoteId: quote.quote_id,
+  client: quote.customer_name || '거래처 미기재',
+  date: quote.issue_date ? quote.issue_date.slice(0, 10).replaceAll('-', '. ') : '날짜 미기재',
+  amount: quote.total_amount == null ? 0 : Number(quote.total_amount),
+  status: quoteStatus[quote.status] || quote.status || '상태 미기재',
+  title: quote.title || quote.source_filename || '',
+});
 
 const navItems = [
   { label: '홈', icon: Home }, { label: '견적서 목록', icon: FileText },
   { label: '단가 비교', icon: BarChart3 }, { label: '거래처 관리', icon: UserRound },
   { label: '품목 관리', icon: Box },
-  { label: '프로필', icon: UserRound },
 ];
 
 export default function App() {
-  const [quotes, setQuotes] = useState(seed);
+  const [quotes, setQuotes] = useState([]);
+  const [quotesLoading, setQuotesLoading] = useState(true);
+  const [quotesError, setQuotesError] = useState('');
   const [upload, setUpload] = useState(false);
   const [file, setFile] = useState(null);
   const [uploadState, setUploadState] = useState('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const [quoteListRefresh, setQuoteListRefresh] = useState(0);
+  const [pendingQuote, setPendingQuote] = useState(null);
   const [toast, setToast] = useState('');
   const [activeNav, setActiveNav] = useState('홈');
   const notify = (message) => { setToast(message); window.setTimeout(() => setToast(''), 2600); };
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setQuotesLoading(true);
+    setQuotesError('');
+    requestQuote('/search', { method: 'POST', signal: controller.signal, body: JSON.stringify({ limit: 5, offset: 0 }) })
+      .then((payload) => {
+        if (!controller.signal.aborted) setQuotes((payload.items || []).map(homeQuote));
+      })
+      .catch((reason) => {
+        if (reason.name !== 'AbortError') {
+          setQuotes([]);
+          setQuotesError(reason.message || '최근 견적서를 불러오지 못했습니다.');
+        }
+      })
+      .finally(() => { if (!controller.signal.aborted) setQuotesLoading(false); });
+    return () => controller.abort();
+  }, [quoteListRefresh]);
+
   const navigate = (label) => {
+    setPendingQuote(null);
     setActiveNav(label);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (['홈', '견적서 목록', '단가 비교', '거래처 관리', '품목 관리'].includes(label)) return;
+    if (['홈', '견적서 목록', '단가 비교', '거래처 관리', '품목 관리', '설정'].includes(label)) return;
     notify(`${label} 화면은 준비 중입니다.`);
+  };
+  const openQuoteFromHome = (quote) => {
+    setPendingQuote(quote);
+    setActiveNav('견적서 목록');
+    setQuoteListRefresh((value) => value + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const addQuote = async () => {
     if (!file) { setUploadState('error'); setUploadMessage('먼저 PDF 또는 XLSX 파일을 선택해 주세요.'); return; }
@@ -96,16 +129,6 @@ export default function App() {
       }
 
       const detail = await requestApi(`/quotes/${encodeURIComponent(quoteId)}`);
-      const quote = {
-        id: detail.quote_number || uploaded.quote_number || quoteId,
-        backendQuoteId: quoteId,
-        client: detail.customer_name || '거래처 미기재',
-        date: detail.issue_date ? detail.issue_date.slice(0, 10).replaceAll('-', '. ') : '날짜 미기재',
-        amount: detail.total_amount ? Number(detail.total_amount) : 0,
-        status: detail.status === 'confirmed' ? '검토 완료' : '검토 미완료',
-        title: detail.title || detail.source_filename || file.name,
-      };
-      setQuotes((current) => [quote, ...current.filter((item) => item.backendQuoteId !== quoteId)]);
       setQuoteListRefresh((value) => value + 1);
       setUploadState('completed');
       setUploadMessage(`Upstage 추출 완료 · 품목 ${detail.items?.length || 0}개를 견적서에 저장했습니다.`);
@@ -120,11 +143,11 @@ export default function App() {
     <header className="topbar">
       <a className="brand" href="#top" onClick={() => navigate('홈')} aria-label="QuoteFlow 홈"><span className="brand-mark"><FileText /></span><span>QuoteFlow</span></a>
       <nav className="main-nav" aria-label="주 메뉴">{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => navigate(label)}><Icon />{label}</button>)}</nav>
-      <button className="user-menu" onClick={() => notify('김담당님 계정 설정은 준비 중입니다.')}><span className="avatar">김</span><span>김담당님</span><ChevronDown /></button>
+      <button className="user-menu" onClick={() => navigate('설정')} aria-label="계정 설정 열기"><span className="avatar">김</span><span>김담당님</span><ChevronDown /></button>
     </header>
 
     <main id="top" className="page-content">
-      {activeNav === '단가 비교' ? <PriceComparison onNotify={notify} /> : activeNav === '거래처 관리' ? <Customers onNotify={notify} /> : activeNav === '품목 관리' ? <Items onNotify={notify} /> : activeNav === '견적서 목록' ? <QuoteListPage key={quoteListRefresh} onUpload={() => setUpload(true)} onNotify={notify} /> : <HomePage quotes={quotes} onNotify={notify} onNavigate={navigate} onUpload={() => setUpload(true)} />}
+      {activeNav === '설정' ? <SettingsPage onNotify={notify} /> : activeNav === '단가 비교' ? <PriceComparison onNotify={notify} /> : activeNav === '거래처 관리' ? <Customers onNotify={notify} /> : activeNav === '품목 관리' ? <Items onNotify={notify} /> : activeNav === '견적서 목록' ? <QuoteListPage key={quoteListRefresh} initialQuote={pendingQuote} onInitialQuoteHandled={() => setPendingQuote(null)} onUpload={() => setUpload(true)} onNotify={notify} /> : <HomePage quotes={quotes} quotesLoading={quotesLoading} quotesError={quotesError} onNotify={notify} onNavigate={navigate} onOpenQuote={openQuoteFromHome} onUpload={() => setUpload(true)} />}
     </main>
 
     {upload && <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setUpload(false); }}><section className="upload-modal" role="dialog" aria-modal="true" aria-labelledby="upload-title"><div className="modal-heading"><div><span>NEW QUOTATION</span><h2 id="upload-title">견적서 등록</h2><p>등록할 견적서 원본 파일을 선택하세요.</p></div><button className="close-button" onClick={() => setUpload(false)} aria-label="닫기"><X /></button></div><label className="upload-drop"><UploadCloud /><b>{file?.name || '파일을 선택하거나 여기에 놓으세요'}</b><small>PDF 또는 XLSX · 등록 후 Upstage 항목 추출</small><input type="file" accept=".pdf,.xlsx" onChange={(event) => { setFile(event.target.files?.[0] || null); setUploadState('idle'); setUploadMessage(''); }} /></label>{uploadMessage && <p className={`upload-progress ${uploadState}`} role="status">{uploadMessage}</p>}<div className="modal-actions"><button className="secondary-button" onClick={() => setUpload(false)}>닫기</button><button className="primary-button" onClick={uploadState === 'completed' ? () => setUpload(false) : addQuote} disabled={['uploading', 'extracting'].includes(uploadState)}>{['uploading', 'extracting'].includes(uploadState) ? <LoaderCircle className="spin" /> : uploadState === 'completed' ? <Check /> : <Plus />}{uploadState === 'uploading' ? '업로드 중' : uploadState === 'extracting' ? '추출 중' : uploadState === 'completed' ? '완료' : uploadState === 'error' ? '다시 시도' : '등록'}</button></div></section></div>}

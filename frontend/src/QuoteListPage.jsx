@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, FileText, Filter, LoaderCircle, MoreVertical, Plus, Search } from 'lucide-react';
 import './QuoteListPage.css';
 import QuoteReviewDialog from './QuoteReviewDialog.jsx';
@@ -22,7 +22,7 @@ function normalizeQuote(quote) {
   return { id: quote.quote_number || quote.quote_id, quoteId: quote.quote_id, title: quote.title || quote.source_filename || '', client: quote.customer_name || '거래처 미기재', date: quote.issue_date ? quote.issue_date.slice(0, 10).replaceAll('-', '. ') : '날짜 미기재', amount: amount(quote.total_amount, quote.currency), status: statusFromApi[quote.status] || quote.status || '상태 미기재', itemCount: quote.item_count ?? 0 };
 }
 
-export default function QuoteListPage({ onUpload, onNotify }) {
+export default function QuoteListPage({ onUpload, onNotify, initialQuote, onInitialQuoteHandled }) {
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('전체');
   const [page, setPage] = useState(0);
@@ -32,6 +32,7 @@ export default function QuoteListPage({ onUpload, onNotify }) {
   const [retry, setRetry] = useState(0);
   const [checked, setChecked] = useState([]);
   const [reviewId, setReviewId] = useState(null);
+  const initialQuoteHandled = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,6 +48,25 @@ export default function QuoteListPage({ onUpload, onNotify }) {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [keyword, status, page, retry]);
+
+  useEffect(() => {
+    if (!initialQuote || initialQuoteHandled.current) return;
+    initialQuoteHandled.current = true;
+    const open = async () => {
+      const knownId = initialQuote.backendQuoteId || initialQuote.quoteId;
+      if (knownId) { setReviewId(knownId); return; }
+      try {
+        const result = await fetchQuotes({ keyword: initialQuote.id, status: '전체', offset: 0 });
+        const found = (result.items || []).map(normalizeQuote).find((quote) => quote.id === initialQuote.id || quote.quoteId === initialQuote.id);
+        if (found?.quoteId) setReviewId(found.quoteId);
+        else onNotify?.(`견적서 ${initialQuote.id}를 백엔드 목록에서 찾지 못했습니다.`);
+      } catch (reason) {
+        onNotify?.(reason.message || '견적서 상세 정보를 찾지 못했습니다.');
+      }
+    };
+    open();
+    onInitialQuoteHandled?.();
+  }, [initialQuote, onInitialQuoteHandled, onNotify]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
   const allChecked = data.items.length > 0 && data.items.every((item) => checked.includes(item.quoteId));
