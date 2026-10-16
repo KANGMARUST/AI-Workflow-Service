@@ -1,21 +1,77 @@
--- Supabase SQL Editor에서 검토 후 실행하세요.
-create type public.quote_status as enum ('review_required','confirmed','rejected','archived','extracting');
-create table public.quotes (
- id uuid primary key default gen_random_uuid(), quote_number text, title text,
- issuer_company text, customer_name text, contact_name text, contact_email text, contact_phone text,
- issue_date date, valid_until date, delivery_date date, subtotal numeric(18,4), tax_amount numeric(18,4),
- total_amount numeric(18,4), currency text not null default 'KRW', discount_terms text, payment_terms text,
- delivery_terms text, status public.quote_status not null default 'review_required',
- source_filename text, source_storage_path text, extraction_raw jsonb, review_note text,
- created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+-- QuoteFlow initial schema. Review before applying to an EMPTY database.
+-- Replaces the earlier unimplemented draft; this is NOT an upgrade migration.
+-- App uses a server-side PostgreSQL role. Do not expose these tables through an anonymous REST role.
+-- Decimal source values are canonical JSON strings to retain precision across SQLite/PostgreSQL.
+
+CREATE TABLE quotes (
+	id VARCHAR(36) NOT NULL,
+	kind VARCHAR(20) NOT NULL,
+	source_quote_id VARCHAR(36),
+	source_filename TEXT,
+	source_storage_path TEXT,
+	source_hash VARCHAR(64),
+	status VARCHAR(30) NOT NULL,
+	payload JSON NOT NULL,
+	extraction_raw JSON NOT NULL,
+	extraction_status VARCHAR(30) NOT NULL,
+	version INTEGER NOT NULL,
+	created_at VARCHAR(40) NOT NULL,
+	updated_at VARCHAR(40) NOT NULL,
+	deleted_at VARCHAR(40),
+	PRIMARY KEY (id),
+	UNIQUE (source_hash)
 );
-create table public.quote_items (
- id uuid primary key default gen_random_uuid(), quote_id uuid not null references public.quotes(id) on delete cascade,
- line_number integer, item_name text not null, item_name_original text, specification text, unit text,
- quantity numeric(18,4), unit_price numeric(18,4), amount numeric(18,4), currency text not null default 'KRW',
- raw_fields jsonb, created_at timestamptz not null default now()
+
+CREATE INDEX ix_quotes_deleted_at ON quotes (deleted_at);
+
+CREATE INDEX ix_quotes_status ON quotes (status);
+
+CREATE TABLE quote_items (
+	id VARCHAR(36) NOT NULL,
+	quote_id VARCHAR(36) NOT NULL,
+	line_number INTEGER NOT NULL,
+	item_name TEXT NOT NULL,
+	item_name_original TEXT,
+	payload JSON NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY(quote_id) REFERENCES quotes (id) ON DELETE CASCADE
 );
-create index quotes_customer_idx on public.quotes(customer_name);
-create index quotes_date_idx on public.quotes(issue_date desc);
-create index quotes_status_idx on public.quotes(status);
--- RLS는 인증/조직별 권한 정책 결정 후 별도 설정하세요.
+
+CREATE INDEX ix_quote_items_quote_id ON quote_items (quote_id);
+
+CREATE TABLE quote_revisions (
+	id VARCHAR(36) NOT NULL,
+	quote_id VARCHAR(36) NOT NULL,
+	version INTEGER NOT NULL,
+	action VARCHAR(40) NOT NULL,
+	snapshot JSON NOT NULL,
+	created_at VARCHAR(40) NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY(quote_id) REFERENCES quotes (id)
+);
+
+CREATE INDEX ix_quote_revisions_quote_id ON quote_revisions (quote_id);
+
+CREATE TABLE agent_jobs (
+	id VARCHAR(36) NOT NULL,
+	quote_id VARCHAR(36),
+	kind VARCHAR(30) NOT NULL,
+	status VARCHAR(30) NOT NULL,
+	provider VARCHAR(30) NOT NULL,
+	result JSON NOT NULL,
+	error TEXT,
+	created_at VARCHAR(40) NOT NULL,
+	updated_at VARCHAR(40) NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY(quote_id) REFERENCES quotes (id)
+);
+
+CREATE INDEX ix_agent_jobs_status ON agent_jobs (status);
+
+CREATE INDEX ix_agent_jobs_quote_id ON agent_jobs (quote_id);
+
+-- No anonymous policies. The server connects with its trusted DB role.
+ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_revisions ENABLE ROW LEVEL SECURITY;

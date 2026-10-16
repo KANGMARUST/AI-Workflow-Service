@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-16",
+  "automated_tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "35",
+    "time": "3.946",
+    "timestamp": "2026-10-16T17:29:50.633039+09:00",
+    "hostname": "DESKTOP-DNII994"
+  },
+  "live_studio_checks": [
+    {
+      "kind": "extract",
+      "passed": true,
+      "remote_job_id": "job_eZFHufffx4KS75Lun8B92P",
+      "input_file_deleted": true
+    },
+    {
+      "kind": "compare",
+      "passed": true,
+      "remote_job_id": "job_ifn6QyEwN49CfrhHRaTEjT",
+      "input_file_deleted": true
+    },
+    {
+      "kind": "draft",
+      "passed": true,
+      "remote_job_id": "job_aj32LgeSUBejU6hVn8VpKY",
+      "input_file_deleted": true
+    }
+  ],
+  "local_http_pdf_workflow": "passed",
+  "local_http_xlsx_workflow": "passed",
+  "pdf_visual_review": "single-page and 8-page table first/last pages checked",
+  "postgresql_live": "not run - no connection credentials",
+  "docker": "not run - executable unavailable"
+}

@@ -1,0 +1,2 @@
+# Optional: regenerate the fictional Studio sample PDFs on Windows.
+reportlab>=5,<6

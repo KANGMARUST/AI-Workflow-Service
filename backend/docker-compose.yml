@@ -3,5 +3,9 @@ services:
     build: .
     ports: ["8000:8000"]
     env_file: .env
-    volumes: ["./app:/app/app"]
+    volumes:
+      - "./app:/app/app"
+      - "quoteflow-data:/app/.runtime"
     restart: unless-stopped
+volumes:
+  quoteflow-data:

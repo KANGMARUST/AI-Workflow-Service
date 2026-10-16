@@ -1,0 +1,16 @@
+# Local credentials and virtual environment
+.env
+.env.*
+!.env.example
+.venv/
+
+# Python and development tools
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local documents and generated data
+.runtime/
