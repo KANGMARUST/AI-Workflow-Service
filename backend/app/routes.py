@@ -168,13 +168,13 @@ def restore(request: Request, quote_id: str):
 
 
 @router.get("/items/history", summary="품목 단가 이력")
-def item_history(request: Request, keyword: str = Query(..., min_length=1, max_length=200), limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+def item_history(request: Request, keyword: str | None = Query(None, min_length=1, max_length=200), limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
     from .domain import normalized
     with svc(request).db.sessions() as session:
         rows = []
         for q in session.scalars(select(Quote).where(Quote.deleted_at.is_(None)).order_by(Quote.created_at.desc())):
             for item in q.items:
-                if normalized(keyword) in normalized(item.item_name):
+                if not keyword or normalized(keyword) in normalized(item.item_name):
                     rows.append({**item.payload, "quote_id": q.id, "item_id": item.id, "line_number": item.line_number, **{k: q.payload.get(k) for k in ("customer_name", "issue_date", "payment_terms", "delivery_terms", "discount_terms", "tax_rate")}, "currency": item.payload.get("currency") or q.payload.get("currency"), "status": q.status, "kind": q.kind})
         return {"items": rows[offset:offset+limit], "total": len(rows), "limit": limit, "offset": offset}
 

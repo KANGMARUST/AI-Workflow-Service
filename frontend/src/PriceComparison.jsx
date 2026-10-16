@@ -92,7 +92,7 @@ function downloadHistory(rows) {
   const csv = [columns.map(([label]) => cell(label)).join(','), ...rows.map((row) => columns.map(([, key]) => cell(row[key])).join(','))].join('\r\n');
   const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
   const anchor = document.createElement('a');
-  anchor.href = url; anchor.download = 'quoteflow-price-history.csv'; anchor.click();
+  anchor.href = url; anchor.download = '모두의-견적서-단가-이력.csv'; anchor.click();
   URL.revokeObjectURL(url);
 }
 
@@ -123,9 +123,9 @@ function PriceTrend({ rows, currency }) {
 }
 
 export default function PriceComparison({ onNotify }) {
-  const [keyword, setKeyword] = useState('지그');
-  const [submittedKeyword, setSubmittedKeyword] = useState('지그');
-  const [apiRows, setApiRows] = useState(null);
+  const [keyword, setKeyword] = useState('');
+  const [submittedKeyword, setSubmittedKeyword] = useState('');
+  const [apiRows, setApiRows] = useState([]);
   const [apiTotal, setApiTotal] = useState(0);
   const [isDemo, setIsDemo] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -144,12 +144,25 @@ export default function PriceComparison({ onNotify }) {
   const [applyingPrice, setApplyingPrice] = useState(false);
 
   useEffect(() => {
-    if (!submittedKeyword.trim()) { setApiRows([]); setApiTotal(0); return undefined; }
     const controller = new AbortController();
     setLoading(true); setError(''); setIsDemo(false);
-    const params = new URLSearchParams({ keyword: submittedKeyword.trim(), limit: '100', offset: '0' });
-    apiJson(`/items/history?${params}`, { signal: controller.signal })
-      .then((data) => { setApiRows((data.items || []).map(normalizeRow)); setApiTotal(data.total || 0); setCustomerFilter('전체'); setUnitFilter('전체'); setCurrencyFilter('전체'); setPage(0); })
+    const keyword = submittedKeyword.trim();
+    const loadHistory = async () => {
+      const allRows = [];
+      let offset = 0;
+      let total = 0;
+      do {
+        const params = new URLSearchParams({ limit: '100', offset: String(offset) });
+        if (keyword) params.set('keyword', keyword);
+        const data = await apiJson(`/items/history?${params}`, { signal: controller.signal });
+        allRows.push(...(data.items || []));
+        total = data.total || 0;
+        offset += data.limit || 100;
+      } while (!controller.signal.aborted && offset < total);
+      if (controller.signal.aborted) return;
+      setApiRows(allRows.map(normalizeRow)); setApiTotal(total); setCustomerFilter('전체'); setUnitFilter('전체'); setCurrencyFilter('전체'); setPage(0);
+    };
+    loadHistory()
       .catch((reason) => {
         if (reason.name !== 'AbortError') { setApiRows(demoRows); setApiTotal(demoRows.length); setIsDemo(true); setError(reason.message || '단가 이력을 불러오지 못했습니다.'); }
       })

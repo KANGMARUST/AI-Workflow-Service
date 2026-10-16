@@ -141,7 +141,7 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="topbar">
-      <a className="brand" href="#top" onClick={() => navigate('홈')} aria-label="QuoteFlow 홈"><span className="brand-mark"><FileText /></span><span>QuoteFlow</span></a>
+      <a className="brand" href="#top" onClick={() => navigate('홈')} aria-label="모두의 견적서 홈"><img className="brand-logo" src="/modu-quote-logo.png" alt="" aria-hidden="true" /><span>모두의 견적서</span></a>
       <nav className="main-nav" aria-label="주 메뉴">{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => navigate(label)}><Icon />{label}</button>)}</nav>
       <button className="user-menu" onClick={() => navigate('설정')} aria-label="계정 설정 열기"><span className="avatar">김</span><span>김담당님</span><ChevronDown /></button>
     </header>

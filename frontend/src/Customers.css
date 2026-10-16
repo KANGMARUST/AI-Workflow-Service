@@ -209,8 +209,14 @@
 .customers-page .customer-pagination{height:68px;padding:0;border-top:1px solid #dce3ed;font-size:12px}
 .customers-page .customer-pagination select{font-size:12px}
 .customers-page .customer-pagination b{font-size:12px}
+.customers-page .customer-filter-actions{display:flex;align-items:center;justify-self:end;gap:8px;white-space:nowrap}
+.customers-page .customer-search-input,.customers-page .customer-select,.customers-page .customer-reset,.customers-page .customer-add-button{height:43px;box-sizing:border-box}
+.customers-page .customer-add-button{padding:0 13px;font-size:14px}
 @media(max-width:600px){
   .customers-page .customer-filters{padding:0}
+  .customers-page .customer-filter-actions{grid-column:1/-1;justify-self:end}
+  .customers-page .customer-search-input,.customers-page .customer-select,.customers-page .customer-reset,.customers-page .customer-add-button{height:39px}
+  .customers-page .customer-add-button{padding-inline:10px;font-size:12px}
   .customers-page .customers-list>header{height:54px;padding:0 0 12px}
   .customers-page .customer-table-scroll th{height:47px;padding-inline:8px;font-size:11px}
   .customers-page .customer-table-scroll td{height:56px;padding-inline:8px;font-size:12px}

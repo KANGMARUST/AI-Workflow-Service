@@ -237,7 +237,7 @@ PDF / XLS / XLSX 등록 → 원본 파일 보관 및 견적 ID 발급
 
 `GET /api/quotes/{quote_id}`는 모든 표준 필드, 품목, 메타데이터, 추출 상태, 정합성 검사 결과를 반환한다.
 
-`GET /api/items/history?keyword=모니터`는 품목명으로 과거 단가 기록을 찾는다. 수량·단가·금액과 함께 거래처, 작성일, 결제·납품·할인·세율 조건, 연결 견적 ID를 제공한다. 휴지통을 제외한 저장 품목을 반환한다. 과거에 저장한 항목도 남으므로 `kind`와 `status`를 확인한다. 이 API도 `limit`, `offset`을 지원한다.
+`GET /api/items/history?keyword=모니터`는 품목명으로 과거 단가 기록을 찾는다. `keyword`를 생략하면 전체 품목 단가 이력을 반환한다. 수량·단가·금액과 함께 거래처, 작성일, 결제·납품·할인·세율 조건, 연결 견적 ID를 제공한다. 휴지통을 제외한 저장 품목을 반환한다. 과거에 저장한 항목도 남으므로 `kind`와 `status`를 확인한다. 이 API는 `limit`, `offset` 페이지네이션을 지원한다.
 
 현재 일부 검색과 품목 이력 필터는 데이터를 읽은 뒤 Python에서 처리한다. MVP 규모의 구현이며 대규모 문서 검색 성능을 검증한 상태는 아니다.
 
@@ -378,7 +378,7 @@ Dockerfile과 Compose 설정은 있고 DB·파일용 볼륨을 사용한다. **�
 | DELETE | `/api/quotes/{quote_id}` | 휴지통 이동 |
 | GET | `/api/trash` | 휴지통 목록 |
 | POST | `/api/quotes/{quote_id}/restore` | 복원 |
-| GET | `/api/items/history` | 품목 단가 이력 (`keyword` 필수) |
+| GET | `/api/items/history` | 품목 단가 이력 (`keyword` 선택, 생략 시 전체 조회) |
 | POST | `/api/compare` | 계산 기반 비교 |
 | GET | `/api/quotes/{quote_id}/export` | PDF·XLSX 출력 |
 | POST | `/api/agent-runs` | Studio 비교 설명 |

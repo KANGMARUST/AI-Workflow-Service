@@ -113,8 +113,14 @@
 .items-page .item-pagination{height:68px;padding:0;border-top:1px solid #dce3ed;font-size:12px}
 .items-page .item-pagination select{font-size:12px}
 .items-page .item-pagination b{font-size:12px}
+.items-page .item-filter-actions{display:flex;align-items:center;justify-self:end;gap:8px;white-space:nowrap}
+.items-page .item-search>span,.items-page .item-select,.items-page .item-reset,.items-page .item-add-button{height:43px;box-sizing:border-box}
+.items-page .item-add-button{padding:0 13px;font-size:14px}
 @media(max-width:600px){
   .items-page .item-filters{padding:0}
+  .items-page .item-filter-actions{grid-column:1/-1;justify-self:end}
+  .items-page .item-search>span,.items-page .item-select,.items-page .item-reset,.items-page .item-add-button{height:39px}
+  .items-page .item-add-button{padding-inline:10px;font-size:12px}
   .items-page .item-list>header{height:54px;padding:0 0 12px}
   .items-page .item-table-scroll th{height:47px;padding-inline:7px;font-size:11px}
   .items-page .item-table-scroll td{height:56px;padding-inline:7px;font-size:12px}

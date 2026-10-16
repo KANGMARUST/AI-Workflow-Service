@@ -25,7 +25,7 @@ export default function SettingsPage({ onNotify }) {
   };
 
   return <div className="settings-page">
-    <header className="settings-page-heading"><div><span>SETTINGS</span><h1>계정 설정</h1><p>계정 정보와 QuoteFlow 사용 환경을 관리하세요.</p></div><button className="primary-button settings-save" onClick={save}><Save />변경 사항 저장</button></header>
+    <header className="settings-page-heading"><div><span>SETTINGS</span><h1>계정 설정</h1><p>계정 정보와 모두의 견적서 사용 환경을 관리하세요.</p></div><button className="primary-button settings-save" onClick={save}><Save />변경 사항 저장</button></header>
     <div className="settings-layout">
       <nav className="settings-nav" aria-label="설정 메뉴">
         <button className={section === 'account' ? 'active' : ''} onClick={() => setSection('account')}><UserRound />계정 설정<ChevronRight /></button>
@@ -35,7 +35,7 @@ export default function SettingsPage({ onNotify }) {
 
       <form className="settings-form" onSubmit={save}>
         {section === 'account' ? <>
-          <section className="settings-card account-card"><header><div><h2>계정 정보</h2><p>QuoteFlow에서 사용할 프로필 정보를 확인하고 수정할 수 있습니다.</p></div></header>
+          <section className="settings-card account-card"><header><div><h2>계정 정보</h2><p>모두의 견적서에서 사용할 프로필 정보를 확인하고 수정할 수 있습니다.</p></div></header>
             <div className="settings-profile"><div className="settings-avatar">{settings.name.trim().slice(0, 1) || '김'}</div><div><b>{settings.name || '사용자'}</b><small>{settings.role} · {settings.department}</small></div></div>
             <div className="settings-fields">
               <label>이름<input value={settings.name} onChange={(event) => update('name', event.target.value)} placeholder="이름" /></label>

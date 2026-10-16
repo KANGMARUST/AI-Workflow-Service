@@ -70,7 +70,7 @@ SQL에는 RLS 활성화가 포함되며 익명 정책은 만들지 않는다. �
 | 5 | `PATCH /api/edit/{quote_id}` | 변경 필드와 `expected_version` 전송 |
 | 6 | `POST /api/status/{quote_id}` | 검토 후 상태·메모 저장 |
 | 7 | `GET /api/cards` 또는 `POST /api/search` | 목록 `{items,total,limit,offset}` |
-| 8 | `GET /api/items/history?keyword=센서` | 품목별 단가·거래조건 이력 |
+| 8 | `GET /api/items/history?keyword=센서` (keyword 생략 시 전체) | 품목별 단가·거래조건 이력 |
 | 9 | `POST /api/compare` | 선택한 견적의 조건별 단가 비교 |
 | 10 | `GET /api/quotes/{quote_id}/export?format=xlsx` | 지정 양식 파일. pdf도 지원 |
 

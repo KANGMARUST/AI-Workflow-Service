@@ -122,3 +122,37 @@
   .home-page .quick-list{padding:0 12px 10px}
   .home-page .quick-action{padding-block:5px}
 }
+
+/* Functional color cues for the dashboard. */
+.home-page .welcome-row h1{color:#183d68}
+.home-page .heading-rule{background:linear-gradient(90deg,#3978d4 0%,#71b8c3 100%);border-radius:99px}
+.home-page .panel-heading h2:before{background:linear-gradient(180deg,#3978d4,#27a3a0)}
+.home-page .recent-panel .panel-heading{border-bottom-color:#d4e1f1}
+.home-page .recent-panel .quotes-table thead{box-shadow:inset 0 -1px #d8e4f2}
+.home-page .recent-panel .quotes-table th{color:#536b8a}
+.home-page .home-quote-row .quote-id{color:#2864a8;font-weight:600}
+.home-page .home-quote-row:hover{background:#f1f6fd}
+.home-page .quick-action{transition:background .16s ease,transform .16s ease}
+.home-page .quick-action:hover{transform:translateX(2px)}
+.home-page .quick-action:focus-visible{outline:2px solid #9bbce6;outline-offset:2px}
+.home-page .quick-action .quick-icon{transition:transform .16s ease}
+.home-page .quick-action:hover .quick-icon{transform:scale(1.06)}
+.home-page .quick-action.tone-blue .quick-icon{background:var(--accent-blue-soft);color:#3474c8}
+.home-page .quick-action.tone-teal .quick-icon{background:var(--accent-teal-soft);color:var(--accent-teal)}
+.home-page .quick-action.tone-violet .quick-icon{background:var(--accent-violet-soft);color:var(--accent-violet)}
+.home-page .quick-action.tone-amber .quick-icon{background:var(--accent-amber-soft);color:var(--accent-amber)}
+.home-page .quick-action.tone-blue:hover{background:#f1f6ff}
+.home-page .quick-action.tone-teal:hover{background:#f1faf9}
+.home-page .quick-action.tone-violet:hover{background:#f7f5ff}
+.home-page .quick-action.tone-amber:hover{background:#fff9ef}
+.home-page .quick-action.tone-blue .quick-chevron{color:#5d8bc8}
+.home-page .quick-action.tone-teal .quick-chevron{color:#429895}
+.home-page .quick-action.tone-violet .quick-chevron{color:#8070be}
+.home-page .quick-action.tone-amber .quick-chevron{color:#b2864a}
+.home-page .updates-panel li.is-complete .update-dot{background:#26986c;box-shadow:0 0 0 4px #e6f5ed}
+.home-page .updates-panel li.is-pending .update-dot{background:#d4932d;box-shadow:0 0 0 4px #fff3df}
+.home-page .updates-panel li.is-complete .update-text{color:#315c4b}
+.home-page .updates-panel li.is-pending .update-text{color:#70572e}
+.home-page .updates-panel time{font-variant-numeric:tabular-nums}
+.home-page .table-controls .search-box:focus-within{border-color:#8db0dc;box-shadow:0 0 0 3px #3978d414}
+.home-page .table-controls select:focus-visible{outline:2px solid #9bbce6;outline-offset:2px}
