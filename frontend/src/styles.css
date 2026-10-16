@@ -48,3 +48,8 @@
 /* Match home dashboard spacing and table rhythm to the price comparison view. */
 
 /* Apply the price comparison typography and spacing system to customer management. */
+.upload-progress{margin:14px 0;color:#536983;font-size:12px;line-height:1.5}
+.upload-progress.uploading,.upload-progress.extracting{color:#315f94}
+.upload-progress.completed{color:#23704c}
+.upload-progress.error{color:#a44d43}
+.modal-actions .primary-button:disabled{opacity:.65;cursor:wait}

@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 .venv/
+.venv312/
 
 # Python and development tools
 __pycache__/

@@ -177,7 +177,7 @@ export default function PriceComparison({ onNotify }) {
       return String(b.date).localeCompare(String(a.date));
     });
   }, [sourceRows, customerFilter, unitFilter, currencyFilter, periodFilter, sort]);
-  const selected = filteredRows.find((row) => row.itemId === selectedKey) || filteredRows[0] || null;
+  const selected = filteredRows.find((row) => row.itemId === selectedKey) || null;
   const comparableRows = useMemo(() => exactPriceRows(filteredRows, selected).sort((a, b) => String(a.date).localeCompare(String(b.date))), [filteredRows, selected]);
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const pageRows = filteredRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -202,7 +202,7 @@ export default function PriceComparison({ onNotify }) {
   const offset = page * PAGE_SIZE;
 
   const submitSearch = (event) => { event.preventDefault(); if (!keyword.trim()) return; setPage(0); setSelectedKey(''); setCheckedKeys([]); setSubmittedKeyword(keyword.trim()); };
-  const selectRow = (row) => setSelectedKey(row.itemId);
+  const selectRow = (row) => setSelectedKey((current) => current === row.itemId ? '' : row.itemId);
   const toggleChecked = (row) => setCheckedKeys((current) => current.includes(row.itemId) ? current.filter((key) => key !== row.itemId) : [...current, row.itemId]);
   const applyPriceToDraft = async () => {
     if (!selected?.quoteId || isDemo) { onNotify?.('실제 백엔드 이력에서 품목을 선택한 뒤 적용해 주세요.'); return; }
@@ -238,7 +238,7 @@ export default function PriceComparison({ onNotify }) {
 
   return <section className="comparison-page">
 
-    <form className="panel comparison-search-panel" onSubmit={submitSearch}>
+    <form className="comparison-search-panel" onSubmit={submitSearch}>
       <label className="comparison-search-field"><b>품목 검색</b><span className="comparison-input"><Search /><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="품목명으로 검색하세요." /></span></label>
       <label className="comparison-filter"><b>거래처</b><span className="select-wrap"><select value={customerFilter} onChange={(event) => { setCustomerFilter(event.target.value); setPage(0); }}><option>전체</option>{customers.map((customer) => <option key={customer}>{customer}</option>)}</select><ChevronDown /></span></label>
       <label className="comparison-filter"><b>기간</b><span className="select-wrap has-leading"><CalendarDays /><select value={periodFilter} onChange={(event) => { setPeriodFilter(event.target.value); setPage(0); }}><option>전체 기간</option><option value="3">최근 3개월</option><option value="6">최근 6개월</option><option value="12">최근 1년</option><option value="36">최근 3년</option></select><ChevronDown /></span></label>
@@ -249,8 +249,8 @@ export default function PriceComparison({ onNotify }) {
 
     {error && <div className="comparison-api-notice" role="status"><span>{isDemo ? '백엔드에 연결하지 못해 화면 예시 데이터를 표시 중입니다.' : error}</span><button type="button" onClick={() => setRetry((value) => value + 1)}>다시 연결</button></div>}
 
-    <div className="comparison-content-grid">
-      <section className="panel history-panel">
+    <div className={`comparison-content-grid ${selected ? 'has-selection' : ''}`}>
+      <section className="history-panel">
         <div className="history-panel-heading"><h2>검색 결과 <strong>{loading ? '…' : isDemo ? `${filteredRows.length}건` : `${filteredRows.length}${apiTotal > 100 ? ` / ${apiTotal}` : ''}건`}</strong></h2><div className="history-table-actions"><label className="sort-control"><span>정렬</span><span className="select-wrap"><select value={sort} onChange={(event) => { setSort(event.target.value); setPage(0); }}><option>최신순</option><option>최저 단가순</option><option>최고 단가순</option></select><ChevronDown /></span></label><button className="secondary-button export-button" type="button" onClick={() => downloadHistory(filteredRows)} disabled={!filteredRows.length}><Download />CSV 다운로드</button></div></div>
         {apiTotal > sourceRows.length && !isDemo && <div className="history-limit-note">검색 결과가 많아 최근 100건만 불러왔습니다. 검색어를 더 구체적으로 입력해 주세요.</div>}
         <div className="table-scroll"><table className="price-history-table"><thead><tr><th className="check-col"><input type="checkbox" aria-label="현재 페이지 전체 선택" checked={pageRows.length > 0 && pageRows.every((row) => checkedKeys.includes(row.itemId))} onChange={(event) => setCheckedKeys((current) => event.target.checked ? [...new Set([...current, ...pageRows.map((row) => row.itemId)])] : current.filter((key) => !pageRows.some((row) => row.itemId === key)))} /></th><th>품목명</th><th>규격 / 모델명</th><th>단위</th><th>거래처</th><th>작성일</th><th>수량</th><th>단가</th><th>금액</th><th>견적번호</th></tr></thead><tbody>
@@ -259,8 +259,8 @@ export default function PriceComparison({ onNotify }) {
         <div className="history-pagination"><label>페이지당 <select value={PAGE_SIZE} disabled><option value={PAGE_SIZE}>{PAGE_SIZE}개</option></select></label><div className="pagination-buttons"><button type="button" aria-label="이전 페이지" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}><ChevronLeft /></button><span>{page + 1} / {pageCount}</span><button type="button" aria-label="다음 페이지" disabled={page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)}><ChevronRight /></button></div><small>총 {filteredRows.length}건{!isDemo && apiTotal > sourceRows.length ? ` · 최근 ${sourceRows.length}건 범위` : ''}</small></div>
       </section>
 
-      <aside className="comparison-side-column">
-        <section className="panel selected-item-panel">
+      {selected && <aside className="comparison-side-column">
+        <section className="selected-item-panel">
           {selected ? <>
             <div className="selected-item-heading"><div><span>{selected.itemName}</span><b>{selected.specification}</b></div><div className="unit-tag">단위&nbsp; {selected.unit}</div></div>
             <button className="apply-price-button" type="button" disabled={applyingPrice} onClick={applyPriceToDraft}>{applyingPrice ? <LoaderCircle className="spin" /> : <Plus />}{applyingPrice ? '초안 생성 중' : '새 견적에 적용'}</button>
@@ -270,12 +270,12 @@ export default function PriceComparison({ onNotify }) {
           </> : <div className="selected-empty">품목을 검색하면 단가 요약과 추이를 볼 수 있습니다.</div>}
         </section>
 
-        <section className="panel recent-history-panel"><div className="recent-history-heading"><h2>최근 견적 이력</h2><span>{selected ? selected.itemName : '품목 미선택'}</span></div>
+        <section className="recent-history-panel"><div className="recent-history-heading"><h2>최근 견적 이력</h2><span>{selected.itemName}</span></div>
           {selected && <div className="recent-history-table-wrap"><table className="recent-history-table"><thead><tr><th>작성일</th><th>거래처</th><th>수량</th><th>단가</th><th>상태</th></tr></thead><tbody>{[...comparableRows].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5).map((row) => <tr key={row.itemId}><td>{formatDate(row.date)}</td><td>{row.customer}</td><td>{row.quantity || '—'}</td><td>{formatPrice(row.unitPrice, row.currency)}</td><td><span className={`mini-status ${row.status === 'confirmed' ? 'done' : ''}`}>{statusLabels[row.status] || (isDemo ? '완료' : '—')}</span></td></tr>)}</tbody></table></div>}
           {selectedRows.length > 0 && <div className="compare-feedback">{selectedQuoteIds.length < 2 ? '비교하려면 서로 다른 견적 이력 2건 이상을 선택하세요.' : compareError ? compareError : compareResult ? <><b>{compareStatusText}</b><span>{compareResult.pairs?.length || 0}개 조합 · {compareResult.excluded_rows?.length || 0}개 비교 제외</span></> : '선택한 견적의 비교 조건을 확인하고 있습니다.'}</div>}
           {isDemo && <p className="demo-caption"><FileSpreadsheet />시안 예시 데이터 · 실제 견적 정보가 아닙니다.</p>}
         </section>
-      </aside>
+      </aside>}
     </div>
   </section>;
 }

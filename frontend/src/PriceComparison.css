@@ -144,3 +144,23 @@
   .comparison-page .history-pagination,.comparison-page .history-pagination select,.comparison-page .history-pagination label,.comparison-page .history-pagination small{font-size:11px}
   .comparison-page .price-stat b{font-size:14px}
 }
+
+/* Match the open, background-first layout used by the quote list. */
+.comparison-page .comparison-search-panel,
+.comparison-page .history-panel,
+.comparison-page .selected-item-panel,
+.comparison-page .recent-history-panel{background:transparent;border:0;border-radius:0;box-shadow:none}
+.comparison-page .comparison-search-panel{padding:0;margin-bottom:22px}
+.comparison-page .comparison-input{background:#fff}
+.comparison-page .history-panel-heading{padding:0 0 16px;min-height:60px}
+.comparison-page .price-history-table thead{background:#fff}
+.comparison-page .history-pagination{padding:0;border-top:1px solid #dce3ed}
+.comparison-page .comparison-content-grid{grid-template-columns:minmax(0,1fr)}
+.comparison-page .comparison-content-grid.has-selection{grid-template-columns:minmax(0,2.05fr) minmax(330px,.98fr)}
+.comparison-page .selected-item-panel{padding:0 0 16px;border-bottom:1px solid #dce3ed}
+.comparison-page .recent-history-panel{padding:0}
+.comparison-page .recent-history-heading{padding:0 0 12px;min-height:48px}
+.comparison-page .recent-history-table-wrap{padding:0}
+.comparison-page .recent-history-table th{background:#fff}
+@media(max-width:900px){.comparison-page .comparison-content-grid.has-selection{grid-template-columns:1fr}}
+@media(max-width:600px){.comparison-page .comparison-search-panel{padding:0}.comparison-page .comparison-content-grid.has-selection{grid-template-columns:1fr}.comparison-page .history-panel-heading{padding:0 0 12px}}
