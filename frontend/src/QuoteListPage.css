@@ -1,4 +1,8 @@
 /* QuoteListPage page styles: isolated from the other pages. */
+.all-quotes-page .quote-review-row{cursor:pointer}
+.all-quotes-page .quote-review-row:hover{background:#f0f5fc}
+.all-quotes-page .quote-review-link{border:0;background:transparent;color:#315f94;font:inherit;font-weight:600;padding:4px 0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.all-quotes-page .quote-review-link:focus-visible{outline:2px solid #416da8;outline-offset:4px;border-radius:3px}
 
 
 .all-quotes-page{min-height:calc(100vh - 150px)}
