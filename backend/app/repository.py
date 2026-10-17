@@ -18,9 +18,10 @@ def require(session, quote_id, deleted=False):
 
 
 def detail(quote):
-    data = copy.deepcopy(quote.payload)
+    data = {**QuoteFields().model_dump(mode="json"), **copy.deepcopy(quote.payload)}
     data["items"] = [dict(x.payload, item_id=x.id, line_number=x.line_number) for x in quote.items]
-    return {**data, "quote_id": quote.id, "kind": quote.kind, "source_quote_id": quote.source_quote_id,
+    quoted_amount = data.get("total_amount") if data.get("total_amount") is not None else data.get("subtotal")
+    return {**data, "quoted_amount": quoted_amount, "quote_id": quote.id, "kind": quote.kind, "source_quote_id": quote.source_quote_id,
             "source_filename": quote.source_filename, "status": quote.status,
             "version": quote.version, "created_at": quote.created_at, "updated_at": quote.updated_at,
             "deleted_at": quote.deleted_at, "extraction_status": quote.extraction_status,
@@ -28,7 +29,7 @@ def detail(quote):
 
 
 def clean_fields(quote):
-    data = copy.deepcopy(quote.payload)
+    data = {**QuoteFields().model_dump(mode="json"), **copy.deepcopy(quote.payload)}
     data["items"] = [x.payload.copy() for x in quote.items]
     return data
 
@@ -68,6 +69,8 @@ def search(session, query: QuoteSearchRequest, trash=False):
     matches = []
     for q in quotes:
         d = detail(q)
+        if query.direction and d.get("direction") != query.direction:
+            continue
         if query.keyword and normalized(query.keyword) not in normalized(json.dumps(clean_fields(q), ensure_ascii=False)):
             continue
         if any(getattr(query, k) and normalized(getattr(query, k)) not in normalized(d.get(k)) for k in ("customer_name", "contact_name")):

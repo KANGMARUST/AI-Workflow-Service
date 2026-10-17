@@ -24,7 +24,7 @@ class Service:
         self.files.mkdir(parents=True, exist_ok=True)
         self.agent = UpstageClient(config)
 
-    def upload(self, data, filename):
+    def upload(self, data, filename, direction=None):
         if not filename or any(x in filename for x in ("/", "\\")) or any(ord(x) < 32 or ord(x) == 127 for x in filename) or len(filename) > 240:
             raise HTTPException(400, "안전한 파일명이 필요합니다. 경로는 포함할 수 없습니다.")
         suffix = Path(filename).suffix.lower()
@@ -40,6 +40,8 @@ class Service:
         with self.db.sessions() as session:
             old = session.scalar(select(Quote).where(Quote.source_hash == digest, Quote.deleted_at.is_(None)))
             if old:
+                if direction is not None and direction != old.payload.get("direction"):
+                    raise HTTPException(409, "같은 원본이 이미 등록돼 있습니다. 기존 견적의 보낸/받은 구분을 수정하세요.")
                 return {**detail(old), "duplicate": True}
         path = self.files / (digest + suffix)
         temporary = self.files / (uid() + ".tmp")
@@ -52,7 +54,7 @@ class Service:
                     old.source_hash = None
                 session.flush()
                 quote = Quote(id=uid(), source_filename=filename, source_storage_path=path.name, source_hash=digest)
-                set_fields(quote, QuoteFields().model_dump(mode="json"))
+                set_fields(quote, QuoteFields(direction=direction).model_dump(mode="json"))
                 session.add(quote)
                 record(session, quote, "upload")
                 result = {**detail(quote), "duplicate": False}
@@ -62,6 +64,8 @@ class Service:
             with self.db.sessions() as session:
                 old = session.scalar(select(Quote).where(Quote.source_hash == digest, Quote.deleted_at.is_(None)))
                 if old:
+                    if direction is not None and direction != old.payload.get("direction"):
+                        raise HTTPException(409, "같은 원본이 이미 등록돼 있습니다. 기존 견적의 보낸/받은 구분을 수정하세요.")
                     return {**detail(old), "duplicate": True}
             raise HTTPException(409, "같은 원본 등록이 충돌했습니다. 다시 조회하세요.")
         finally:
@@ -95,7 +99,7 @@ class Service:
             ensure_idle(q)
             if q.kind != "archive":
                 raise HTTPException(409, "원본 등록 견적에만 문서 추출을 실행할 수 있습니다.")
-            has_data = bool(q.items) or any(v is not None and v != "" for k, v in q.payload.items() if k not in ("raw_fields", "review_note"))
+            has_data = bool(q.items) or any(v is not None and v != "" for k, v in q.payload.items() if k not in ("raw_fields", "review_note", "direction"))
             if (q.extraction_status == "completed" or has_data) and not request.force:
                 raise HTTPException(409, "추출·검토 값이 있습니다. 덮어쓸 재추출은 force=true로 명시하세요.")
             self.source(q)
@@ -128,13 +132,11 @@ class Service:
                 extracted = remote["data"]
             else:
                 extracted = local_extract(document)
-            # Preserve explicitly written tax treatment even when the Studio schema
-            # only returns tax_rate. No jurisdictional tax defaults are introduced.
-            tax_fields = local_extract({"text": document["text"], "tables": []})
-            for key in ("tax_terms", "tax_basis"):
-                if not extracted.get(key) and tax_fields.get(key):
-                    extracted[key] = tax_fields[key]
             agent_fields = copy.deepcopy(extracted)
+            explicit = local_extract(document)
+            for key in ("tax_terms", "tax_basis", "validity_terms", "delivery_period", "subtotal", "total_amount"):
+                if not extracted.get(key) and explicit.get(key):
+                    extracted[key] = explicit[key]
             extracted = apply_document_rows(extracted, document)
             fields, warnings = normalize_result(extracted)
             if document.get("selection_required"):
@@ -145,6 +147,7 @@ class Service:
             with self.db.sessions.begin() as session:
                 job = session.get(Job, job_id)
                 q = require(session, job.quote_id)
+                fields["direction"] = q.payload.get("direction")
                 set_fields(q, fields)
                 q.extraction_raw = {"provider": provider, "text": document["text"], "fields": extracted, "agent_fields": agent_fields, "warnings": warnings,
                                     **{k: v for k, v in remote.items() if k != "data"}}

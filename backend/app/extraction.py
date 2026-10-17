@@ -19,6 +19,18 @@ def scalar(value):
     return value
 
 
+def explicit_date(value):
+    text = re.sub(r"\s*([./-])\s*", r"\1", str(value).strip()).rstrip(".")
+    text = re.sub(r"(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일", r"\1-\2-\3", text)
+    text = re.sub(r"\s*까지$", "", text)
+    for fmt in ("%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
 def normalize_result(source):
     if not isinstance(source, dict):
         raise ValueError("추출 결과는 객체여야 합니다.")
@@ -49,14 +61,7 @@ def normalize_result(source):
                 warnings.append(f"{path}: 숫자 형식이 불명확합니다. 원문을 확인하세요.")
                 return None
         if key in dates:
-            text = re.sub(r"\s*([./-])\s*", r"\1", str(value).strip()).rstrip(".")
-            for fmt in ("%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d", "%Y년 %m월 %d일"):
-                try:
-                    return datetime.strptime(text, fmt).date().isoformat()
-                except ValueError:
-                    continue
-            warnings.append(f"{path}: 날짜를 확정할 수 없습니다.")
-            return None
+            return explicit_date(value)
         if key == "currency":
             text = {"원": "KRW", "₩": "KRW", "달러": "USD", "€": "EUR"}.get(str(value), str(value).upper())
             if not re.fullmatch(r"[A-Z]{3}", text):
@@ -65,15 +70,23 @@ def normalize_result(source):
             return text
         return str(value)
 
-    for key in QuoteFields.model_fields:
-        if key not in ("items", "raw_fields"):
-            data[key] = clean(key, source.get(key), key)
     try:
         raw = parse_json_field(source.get("raw_fields_json", source.get("raw_fields")), {})
         data["raw_fields"] = raw if isinstance(raw, dict) else {}
     except (json.JSONDecodeError, TypeError):
         data["raw_fields"] = {}
         warnings.append("원문 헤더 JSON을 해석하지 못했습니다.")
+    for key in QuoteFields.model_fields:
+        if key not in ("items", "raw_fields", "direction"):
+            data[key] = clean(key, source.get(key), key)
+    for date_key, terms_key in (("valid_until", "validity_terms"), ("delivery_date", "delivery_period")):
+        original = clean(terms_key, source.get(date_key), date_key) or clean(terms_key, data["raw_fields"].get(date_key), date_key)
+        terms = data[terms_key] or clean(terms_key, data["raw_fields"].get(terms_key), terms_key)
+        if not data[date_key]:
+            data[date_key] = explicit_date(original or terms or "")
+        data[terms_key] = terms or original
+    if source.get("issue_date") and not data["issue_date"]:
+        warnings.append("issue_date: 날짜를 확정할 수 없습니다.")
     rows = source.get("items", [])
     if not isinstance(rows, list):
         raise ValueError("품목 추출 결과는 배열이어야 합니다.")

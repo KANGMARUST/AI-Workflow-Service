@@ -31,9 +31,11 @@ ALIASES = {
     "contact_name": ["담당자", "contactname"], "contact_email": ["이메일", "email"],
     "contact_phone": ["연락처", "전화번호", "phone"],
     "issue_date": ["작성일", "발행일", "견적일", "견적일자", "發行日字", "issuedate"],
-    "valid_until": ["유효기간", "유효일", "validuntil"], "delivery_date": ["납기일", "deliverydate"],
+    "valid_until": ["유효일", "유효기한", "validuntil"], "delivery_date": ["납기일", "deliverydate"],
+    "validity_terms": ["유효기간", "有效期間", "有効期間", "effectivefor", "validity"],
+    "delivery_period": ["납기", "예정납기", "豫定納期", "delivery", "leadtime"],
     "subtotal": ["공급가액", "소계", "subtotal"], "tax_amount": ["부가세", "부가가치세", "세액", "taxamount"],
-    "tax_rate": ["세율", "taxrate"], "total_amount": ["총액", "합계금액", "총금액", "grandtotal", "totalamount"],
+    "tax_rate": ["세율", "taxrate"], "total_amount": ["총액", "합계금액", "총금액", "grandtotal", "totalamount", "합계", "금액합계", "견적금액", "見積金額", "見積金額"],
     "tax_terms": ["세금조건"], "tax_basis": ["세금기준"],
     "currency": ["통화", "currency"], "payment_terms": ["결제조건", "지급조건", "paymentterms"],
     "delivery_terms": ["납품조건", "인도조건", "deliveryterms"],
@@ -244,13 +246,15 @@ def local_extract(document):
         for row in table:
             values = [str(x if x is not None else "").strip() for x in row]
             for i, value in enumerate(values[:-1]):
-                key = lookup.get(norm(value))
+                key = lookup.get(norm(re.sub(r"\([^)]*\)", "", value)))
                 if not key:
                     continue
-                value = next((v for v in values[i+1:] if v), "")
-                if value and norm(value) not in lookup:
-                    result.setdefault(key, value)
-                    result["raw_fields"].setdefault(key, value)
+                following = next((v for v in values[i+1:] if v), "")
+                if following and norm(following) not in lookup:
+                    if key == "total_amount" and norm(re.sub(r"\([^)]*\)", "", value)) in {"합계", "금액합계", "견적금액", "見積金額", "見積金額"} and result.get("tax_basis") == "exclusive":
+                        key = "subtotal"
+                    result.setdefault(key, following)
+                    result["raw_fields"].setdefault(key, following)
             header = {i: k for i, value in enumerate(values) for k, names in ITEM_ALIASES.items() if norm(value) in {norm(name) for name in names}}
             if "item_name" in header.values() and len(header) >= 2:
                 if mapping is None or len(header) >= len(mapping):
@@ -268,6 +272,24 @@ def local_extract(document):
                 item["original_item_name"] = item["item_name"]
                 item["raw_fields"] = dict(item)
                 result["items"].append(item)
+    # These explicit terms can sit in a neighbouring PDF column, so the text
+    # line contains the project name/amount before the term itself.
+    validity = re.search(r"(?:견적(?:일|일자)?|발행일)\s*(?:로부터|부터|후)\s*\d+\s*(?:영업일|일|주|개월|달|월)", text)
+    if validity:
+        result.setdefault("validity_terms", validity[0])
+    delivery = re.search(r"(?:발주|주문|계약|수주)\s*(?:일로부터|일?\s*후|로부터|부터)\s*\d+\s*(?:영업일|일|주|개월|달|월)(?:\s*이내)?", text)
+    if delivery:
+        result.setdefault("delivery_period", delivery[0])
+    elif re.search(r"납\s*기\s*[:：]?\s*\n[^\n]*일정\s*협의", text):
+        result.setdefault("delivery_period", "일정협의")
+    number = r"(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+    summary = rf"\s*(?:금\s*액\s*합\s*계|합\s*계|총\s*액|총\s*계|견\s*적\s*금\s*액)\s*(?:\([^)]*\))?\s*[:：]?\s*(?:KRW|₩)?\s*(?P<amount>{number})\s*원?\s*(?:\([^)]*\))?\s*"
+    for line in text.splitlines():
+        match = re.fullmatch(summary, line, re.I)
+        if match:
+            key = "subtotal" if result.get("tax_basis") == "exclusive" else "total_amount"
+            result.setdefault(key, match["amount"])
+            result["raw_fields"].setdefault(key, match["amount"])
     if document.get("line_items"):
         result["items"] = document["line_items"]
     if document.get("selection_required"):
@@ -309,6 +331,7 @@ def quote_pdf(quote, custom_font=None):
     p = lambda value: Paragraph(escape(str(value if value is not None else "미기재")), style)
     title_style = ParagraphStyle("title", parent=style, fontSize=18, leading=25)
     parts = [Paragraph("견적 아카이브 사본", title_style), Spacer(1, 14)]
+    parts.append(p(f"견적서 구분: {DIRECTION_LABELS.get(quote.get('direction'), '미분류')}"))
     for key, label in [("quote_number", "견적번호"), ("title", "제목"), ("issuer_company", "발행회사"), ("customer_name", "고객사"), ("issue_date", "작성일"), ("valid_until", "유효기간"), ("delivery_date", "납기일")]:
         parts.append(p(f"{label}: {quote.get(key) or '미기재'}"))
     parts.append(Spacer(1, 14))
@@ -334,6 +357,7 @@ def quote_xlsx(quote):
     sheet = workbook.active
     sheet.title = "견적서"
     rows = [["견적 아카이브 사본"], ["상태", STATUS_LABELS[quote["status"]]], ["버전", quote["version"]]]
+    rows.append(["견적서 구분", DIRECTION_LABELS.get(quote.get("direction"), "미분류")])
     for key in ("quote_number", "title", "issuer_company", "customer_name", "issue_date", "valid_until", "delivery_date", "currency"):
         label = {"quote_number": "견적번호", "title": "제목", "issuer_company": "발행 회사", "customer_name": "고객사", "issue_date": "작성일", "valid_until": "유효기간", "delivery_date": "납기일", "currency": "통화"}[key]
         rows.append([label, quote.get(key)])
@@ -367,8 +391,9 @@ def agent_input(title, data, custom_font=None):
     return make_pdf(title, json.dumps(data, ensure_ascii=False, indent=2, default=str).splitlines(), custom_font)
 
 
-EXPORT_LABELS = {"currency": "통화", "subtotal": "공급가액", "tax_rate": "세율 (%)", "tax_terms": "세금 조건", "tax_amount": "부가세", "total_amount": "총액", "payment_terms": "결제 조건", "delivery_terms": "납품 조건", "discount_terms": "할인 조건", "notes": "비고"}
+EXPORT_LABELS = {"currency": "통화", "subtotal": "공급가액", "tax_rate": "세율 (%)", "tax_terms": "세금 조건", "tax_amount": "부가세", "total_amount": "세금 포함 총액", "validity_terms": "유효기간 조건", "delivery_period": "납기 조건", "payment_terms": "결제 조건", "delivery_terms": "납품 조건", "discount_terms": "할인 조건", "notes": "비고"}
 STATUS_LABELS = {"review_required": "확인 필요", "extracting": "추출 중", "confirmed": "검토 완료", "rejected": "반려", "archived": "보관"}
+DIRECTION_LABELS = {"sent": "보낸 견적서", "received": "받은 견적서"}
 
 
 def display_number(value):

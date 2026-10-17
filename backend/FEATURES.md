@@ -106,8 +106,10 @@ PDF / XLS / XLSX 등록 → 원본 파일 보관 및 견적 ID 발급
 |---|---|
 | 문서 | `quote_number` 견적번호, `title` 제목, `issuer_company` 발행사 |
 | 거래처·담당자 | `customer_name`, `contact_name`, `contact_email`, `contact_phone` |
-| 날짜 | `issue_date` 작성일, `valid_until` 유효기간, `delivery_date` 납기일 |
-| 금액 | `subtotal` 공급가액, `tax_amount` 세액, `total_amount` 총액, `currency` 통화 |
+| 구분 | 사용자 선택 `direction`: sent(보낸 견적서), received(받은 견적서), null(미분류). 업로드·수정·검색 지원 |
+| 날짜 | `issue_date` 작성일, `valid_until` 확정 유효기한, `delivery_date` 확정 납기일 |
+| 기간 원문 | `validity_terms` 유효기간 조건, `delivery_period` 납기 조건. 상대 기간과 협의 문구 보존 |
+| 금액 | `subtotal` 공급가액, `tax_amount` 세액, `total_amount` 세금 포함 총액, `currency` 통화. 읽기 전용 `quoted_amount`는 총액 우선·없으면 공급가액 |
 | 세금 | `tax_rate` 세율, `tax_terms` 세금 원문 조건, `tax_basis` 별도/포함 |
 | 거래 조건 | `discount_terms`, `payment_terms`, `delivery_terms` |
 | 메모 | `notes` 문서 메모, `review_note` 담당자 검토 메모 |

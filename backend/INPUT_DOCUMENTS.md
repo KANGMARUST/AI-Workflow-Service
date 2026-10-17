@@ -26,6 +26,8 @@
 
 ## API 사용
 
+납기와 유효기간은 확정 날짜가 없는 경우에도 `delivery_period`, `validity_terms`로 보존한다. 세 문서의 값은 각각 “발주 후 3주 / 견적일로부터 30일”, “발주 후 4주 / 견적일로부터 7일”, “일정협의 / 견적일로부터 30일”이다. 두 PDF의 명시된 VAT 별도 합계는 `subtotal`과 읽기 전용 `quoted_amount`로 조회하며 세금 포함 `total_amount`를 추정하지 않는다.
+
 1. `POST /api/add`에 원본 파일을 multipart `file`로 등록한다.
 2. `POST /api/extraction-jobs`에 `{"quote_id":"...","provider":"upstage"}`를 보낸다.
 3. `GET /api/jobs/{job_id}`에서 완료·실패를 확인한다.

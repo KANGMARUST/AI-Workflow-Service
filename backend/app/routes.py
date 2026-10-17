@@ -1,7 +1,7 @@
 import hashlib
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -20,11 +20,11 @@ def svc(request):
 
 
 @router.post("/add", status_code=201, summary="견적서 원본 등록")
-async def add_quote(request: Request, file: UploadFile = File(...)):
+async def add_quote(request: Request, file: UploadFile = File(...), direction: Literal["sent", "received"] | None = Form(None)):
     service = svc(request)
     try:
         content = await file.read(service.config.max_upload_mb*1024*1024+1)
-        return service.upload(content, file.filename)
+        return service.upload(content, file.filename, direction=direction)
     finally:
         await file.close()
 
@@ -67,8 +67,8 @@ def search_get(request: Request, keyword: str = Query(..., min_length=1, max_len
 
 
 @router.get("/cards", response_model=QuoteListResponse, summary="견적서 목록")
-def get_cards(request: Request, status: QuoteStatus | None = None, kind: Literal["archive", "draft"] | None = None, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
-    return search_quotes(request, QuoteSearchRequest(status=status, kind=kind, limit=limit, offset=offset))
+def get_cards(request: Request, status: QuoteStatus | None = None, kind: Literal["archive", "draft"] | None = None, direction: Literal["sent", "received"] | None = None, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+    return search_quotes(request, QuoteSearchRequest(status=status, kind=kind, direction=direction, limit=limit, offset=offset))
 
 
 @router.get("/quotes/{quote_id}", summary="상세·품목·검토 오류 조회")
@@ -95,11 +95,14 @@ def edit_quote(request: Request, quote_id: str, payload: QuoteEditRequest):
         check_version(q, payload.expected_version)
         changes = payload.model_dump(mode="json", exclude_unset=True, exclude={"expected_version"})
         if changes:
-            data = clean_fields(q)
-            data.update(changes)
-            data["items"], data["raw_fields"] = data.get("items") or [], data.get("raw_fields") or {}
-            set_fields(q, data)
-            q.status = "review_required"
+            if set(changes) == {"direction"}:
+                q.payload, q.updated_at = {**q.payload, **changes}, now()
+            else:
+                data = clean_fields(q)
+                data.update(changes)
+                data["items"], data["raw_fields"] = data.get("items") or [], data.get("raw_fields") or {}
+                set_fields(q, data)
+                q.status = "review_required"
             record(session, q, "edit")
         return {**detail(q), "updated": bool(changes)}
 

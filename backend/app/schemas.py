@@ -33,6 +33,7 @@ class QuoteItem(InputModel):
 
 
 class QuoteFields(InputModel):
+    direction: Literal["sent", "received"] | None = None
     quote_number: str | None = None
     title: str | None = None
     issuer_company: str | None = None
@@ -43,6 +44,8 @@ class QuoteFields(InputModel):
     issue_date: date | None = None
     valid_until: date | None = None
     delivery_date: date | None = None
+    validity_terms: str | None = None
+    delivery_period: str | None = None
     subtotal: Money | None = None
     tax_amount: Money | None = None
     tax_rate: Money | None = None
@@ -67,12 +70,20 @@ class QuoteEditRequest(QuoteFields):
 
 class QuoteSummary(BaseModel):
     quote_id: str
+    direction: Literal["sent", "received"] | None = None
     quote_number: str | None = None
     title: str | None = None
     customer_name: str | None = None
     contact_name: str | None = None
     issue_date: date | None = None
     total_amount: Decimal | None = None
+    subtotal: Decimal | None = None
+    quoted_amount: Decimal | None = None
+    tax_basis: Literal["exclusive", "inclusive"] | None = None
+    valid_until: date | None = None
+    validity_terms: str | None = None
+    delivery_date: date | None = None
+    delivery_period: str | None = None
     currency: str | None = None
     status: QuoteStatus = QuoteStatus.review_required
     item_count: int = 0
@@ -90,6 +101,7 @@ class QuoteListResponse(BaseModel):
 
 
 class QuoteSearchRequest(InputModel):
+    direction: Literal["sent", "received"] | None = None
     keyword: str | None = Field(default=None, max_length=200)
     customer_name: str | None = Field(default=None, max_length=200)
     contact_name: str | None = Field(default=None, max_length=200)

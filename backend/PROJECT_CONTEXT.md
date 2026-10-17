@@ -58,6 +58,6 @@ backend/
 - 원본 등록과 추출은 별도 요청이다. 작업 ID를 폴링한 뒤 상세를 조회한다.
 - 금액/수량은 십진 문자열 또는 null. 화면용 변환과 전송값을 구분한다.
 - `expected_version`으로 동시 수정 충돌을 처리한다. PATCH에서 미전달과 null은 다르다.
-- 목록은 `quote_id/customer_name/issue_date/total_amount`를 사용한다. 기존 화면의 `id/client/date/amount`와 매핑한다.
+- 목록은 `quote_id/customer_name/issue_date/quoted_amount/direction`를 사용한다. `quoted_amount`는 총액 우선·없으면 공급가액이며, 보낸/받은 구분은 사용자가 선택한다. 기존 화면의 `id/client/date/amount`와 매핑한다.
 - API_TOKEN이 켜졌다면 원본 다운로드도 인증 헤더가 필요하다.
 - 초안 생성·AI 초안 제안은 현재 범위에서 제외한다. 저장된 견적의 Excel/PDF 사본 출력은 유지한다. API 예제와 오류 형식은 `README.md`를 확인한다.

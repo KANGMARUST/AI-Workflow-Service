@@ -79,6 +79,7 @@ SQL에는 RLS 활성화가 포함되며 익명 정책은 만들지 않는다. �
 ```javascript
 const form = new FormData();
 form.append("file", selectedFile);
+form.append("direction", "received"); // sent: 보낸 견적서, received: 받은 견적서
 const uploaded = await fetch(`${API}/api/add`, { method: "POST", body: form, headers: authHeaders }).then(checkResponse);
 const job = await fetch(`${API}/api/extraction-jobs`, {
   method: "POST",
@@ -108,7 +109,18 @@ const job = await fetch(`${API}/api/extraction-jobs`, {
 }
 ```
 
-PATCH 미전달 필드는 유지하고 명시적인 null은 지운다. `items`를 보내면 전체 품목 배열을 교체하고 `items:null`은 빈 배열로 만든다. 상세 품목의 `item_id`, `line_number`는 읽기 전용이므로 수정 요청에서 제외한다. 수정 시 검토 상태는 `review_required`로 돌아간다. 오래된 `expected_version`은 HTTP 409이므로 최신 상세를 다시 읽는다.
+PATCH 미전달 필드는 유지하고 명시적인 null은 지운다. `items`를 보내면 전체 품목 배열을 교체하고 `items:null`은 빈 배열로 만든다. 상세 품목의 `item_id`, `line_number`는 읽기 전용이므로 수정 요청에서 제외한다. 내용 수정 시 검토 상태는 `review_required`로 돌아가며 `direction`만 수정하면 기존 검토 상태를 유지한다. 오래된 `expected_version`은 HTTP 409이므로 최신 상세를 다시 읽는다.
+
+### 납기·유효기간·견적금액·보낸/받은 구분
+
+- `direction`: 사용자 선택 라벨. `sent`(보낸 견적서), `received`(받은 견적서), `null`(미분류). 업로드 multipart 또는 PATCH에서 저장한다. AI는 이 값을 추정하거나 재추출로 바꾸지 않는다. 기존 데이터는 미분류로 조회된다.
+- 라벨은 기존 DB의 `quotes.payload.direction`에 저장하므로 테이블 변경이나 기존 데이터 migration은 필요 없다. `GET /api/cards?direction=received`, `POST /api/search`의 `direction` 조건으로 필터링한다. 같은 원본의 기존 라벨과 다른 라벨을 지정해 중복 업로드하면 409이며 기존 견적을 PATCH로 수정한다.
+- `validity_terms`: “견적일로부터 7일” 같은 유효기간 원문. 확정 날짜가 있으면 `valid_until`에도 저장한다. 상대 기간을 임의의 만료일로 바꾸지 않는다.
+- `delivery_period`: “발주 후 4주”, “일정협의” 같은 납기 원문. `delivery_date`는 확정 납기일이며 `delivery_terms`는 납품 장소·인도조건이다.
+- 상세·목록의 읽기 전용 `quoted_amount`는 명시된 `total_amount`를 우선하고, 없으면 `subtotal`을 반환한다. 프론트 연동 시 이를 견적금액으로 표시하고 공급가액 사용 여부를 함께 표시해야 한다. VAT 별도 합계를 세금 포함 총액으로 바꾸지 않는다. 옵션 선택형 문서에 숫자 합계가 없으면 금액은 null이다.
+- `validity_terms`, `delivery_period`는 수정 및 PDF/XLSX 출력에도 반영한다. 과거 추출 결과에 없는 새 필드는 원본을 재추출해야 저장된다.
+
+프론트엔드는 별도 담당 범위다. 업로드·수정 화면의 `direction` 선택, 목록의 라벨·`quoted_amount` 표시, 상세의 `validity_terms`·`delivery_period` 표시는 프론트 담당자가 위 계약에 맞춰 연결해야 한다.
 
 아카이브의 수량/단가를 수정해도 원문 금액은 자동 변경하지 않는다. 정확한 재계산은 `validation.computed_item_amounts`와 `computed_subtotal`로 별도 제공한다. `validation.warnings`는 `{code,path,message}` 배열이며 누락·중복 가능성·계산 불일치 등을 표시한다. `raw_fields`와 수정 이력, 최초 추출 원문은 보존한다.
 
