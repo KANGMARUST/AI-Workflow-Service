@@ -60,8 +60,8 @@ def test_user_direction_persists_through_extraction_edit_search_and_restart(tmp_
         assert quote['direction'] == 'sent'
         assert quote['validity_terms'] == '견적일로부터 7일'
         assert quote['delivery_period'] == '발주 후 4주'
-        assert quote['quoted_amount'] == quote['subtotal'] == '16000000'
-        assert quote['total_amount'] is None
+        assert quote['quoted_amount'] == quote['total_amount'] == '16000000'
+        assert quote['subtotal'] is None
         listed = client.get('/api/cards', params={'direction': 'sent'}).json()
         assert listed['total'] == 1
         assert listed['items'][0]['quoted_amount'] == '16000000'
@@ -95,4 +95,4 @@ def test_agent_missing_terms_recovered_and_user_label_not_inferred(tmp_path):
         assert quote['direction'] == 'sent'
         assert quote['delivery_period'] == '발주 후 4주'
         assert quote['validity_terms'] == '견적일로부터 7일'
-        assert quote['quoted_amount'] == '16000000'
+        assert quote['quoted_amount'] == quote['total_amount'] == '16000000'

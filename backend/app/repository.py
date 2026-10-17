@@ -10,6 +10,14 @@ from .domain import diagnostics, normalized
 from .schemas import QuoteFields, QuoteSearchRequest
 
 
+def totalize_subtotal(data):
+    """Treat a supplied amount as the quote total when no explicit total exists."""
+    if data.get("total_amount") is None and data.get("subtotal") is not None:
+        data["total_amount"] = data["subtotal"]
+        data["subtotal"] = None
+    return data
+
+
 def require(session, quote_id, deleted=False):
     quote = session.get(Quote, quote_id)
     if not quote or (quote.deleted_at and not deleted):
@@ -19,9 +27,9 @@ def require(session, quote_id, deleted=False):
 
 def detail(quote):
     data = {**QuoteFields().model_dump(mode="json"), **copy.deepcopy(quote.payload)}
+    totalize_subtotal(data)
     data["items"] = [dict(x.payload, item_id=x.id, line_number=x.line_number) for x in quote.items]
-    quoted_amount = data.get("total_amount") if data.get("total_amount") is not None else data.get("subtotal")
-    return {**data, "quoted_amount": quoted_amount, "quote_id": quote.id, "kind": quote.kind, "source_quote_id": quote.source_quote_id,
+    return {**data, "quoted_amount": data.get("total_amount"), "quote_id": quote.id, "kind": quote.kind, "source_quote_id": quote.source_quote_id,
             "source_filename": quote.source_filename, "status": quote.status,
             "version": quote.version, "created_at": quote.created_at, "updated_at": quote.updated_at,
             "deleted_at": quote.deleted_at, "extraction_status": quote.extraction_status,
@@ -30,12 +38,14 @@ def detail(quote):
 
 def clean_fields(quote):
     data = {**QuoteFields().model_dump(mode="json"), **copy.deepcopy(quote.payload)}
+    totalize_subtotal(data)
     data["items"] = [x.payload.copy() for x in quote.items]
     return data
 
 
 def set_fields(quote, data):
-    canonical = QuoteFields.model_validate(data).model_dump(mode="json")
+    canonical = totalize_subtotal(copy.deepcopy(data))
+    canonical = QuoteFields.model_validate(canonical).model_dump(mode="json")
     items = canonical.pop("items")
     quote.payload = canonical
     quote.items = [Item(line_number=i+1, item_name=x["item_name"], item_name_original=x.get("original_item_name"), payload=x) for i, x in enumerate(items)]

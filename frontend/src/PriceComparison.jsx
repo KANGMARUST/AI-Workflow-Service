@@ -11,17 +11,6 @@ const API_PREFIX = apiPrefixRaw.startsWith('/') ? apiPrefixRaw : `/${apiPrefixRa
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
 
-const demoRows = [
-  { itemId: 'sample-1', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '㈜한빛테크', date: '2025-04-21', quantity: '10', unitPrice: '1250000', currency: 'KRW', amount: '12500000', quoteId: 'Q-2025-00123', status: 'confirmed' },
-  { itemId: 'sample-2', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '삼성전자㈜', date: '2025-03-10', quantity: '10', unitPrice: '1180000', currency: 'KRW', amount: '11800000', quoteId: 'Q-2025-00122', status: 'confirmed' },
-  { itemId: 'sample-3', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '㈜미래솔루션', date: '2024-11-05', quantity: '20', unitPrice: '1100000', currency: 'KRW', amount: '22000000', quoteId: 'Q-2024-00756', status: 'review_required' },
-  { itemId: 'sample-4', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: 'LG디스플레이㈜', date: '2024-08-14', quantity: '10', unitPrice: '1300000', currency: 'KRW', amount: '13000000', quoteId: 'Q-2024-00532', status: 'confirmed' },
-  { itemId: 'sample-5', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '㈜현대엔지니어링', date: '2024-06-22', quantity: '5', unitPrice: '1350000', currency: 'KRW', amount: '6750000', quoteId: 'Q-2024-00411', status: 'review_required' },
-  { itemId: 'sample-6', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '㈜선우산업', date: '2024-04-18', quantity: '10', unitPrice: '1200000', currency: 'KRW', amount: '12000000', quoteId: 'Q-2024-00302', status: 'confirmed' },
-  { itemId: 'sample-7', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '한울테크㈜', date: '2024-02-05', quantity: '10', unitPrice: '1150000', currency: 'KRW', amount: '11500000', quoteId: 'Q-2024-00187', status: 'confirmed' },
-  { itemId: 'sample-8', itemName: '지그', specification: 'JIG-A100', unit: 'EA', customer: '대성산업㈜', date: '2023-12-12', quantity: '20', unitPrice: '1100000', currency: 'KRW', amount: '22000000', quoteId: 'Q-2023-00654', status: 'confirmed' },
-];
-
 const statusLabels = { confirmed: '완료', review_required: '미완료', extracting: '추출 중', rejected: '반려', archived: '보관' };
 const formatInteger = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 const formatPrice = (value, currency) => {
@@ -31,6 +20,15 @@ const formatPrice = (value, currency) => {
   return currency === 'KRW' ? `${result}원` : currency ? `${result} ${currency}` : result;
 };
 const formatDate = (value) => value ? value.slice(0, 10).replaceAll('-', '. ') : '날짜 미기재';
+const formatDetails = (value) => String(value || '세부 사항 미기재')
+  .split(/\s*-\.\s*/)
+  .flatMap((part) => part
+    .replace(/,\s*(?=(?:명암비\s|HDMI(?:\s|×)|스위블\s*[,]))/gi, '\n')
+    .replace(/\s+(?=(?:SSD|HDD|Display|O\/S|Warranty)\s*:)/gi, '\n')
+    .replace(/\s*\.\s*(?=HDMI\s+\d+\s*M?\s*케이블)/gi, '\n')
+    .split('\n'))
+  .map((line) => line.trim().replace(/^[,;]+|[,;]+$/g, '').trim())
+  .filter(Boolean);
 const normalizeRow = (row, index) => ({
   itemId: row.item_id || `${row.quote_id}-${row.line_number ?? index}`,
   itemName: row.item_name || '품목명 미기재',
@@ -43,6 +41,7 @@ const normalizeRow = (row, index) => ({
   currency: row.currency || '',
   amount: row.amount == null ? null : String(row.amount),
   quoteId: row.quote_id,
+  quoteNumber: row.quote_number || row.quote_id,
   lineNumber: row.line_number,
   status: row.status || '',
 });
@@ -80,7 +79,7 @@ function averagePrice(values) {
 
 function downloadHistory(rows) {
   const columns = [
-    ['품목명', 'itemName'], ['규격/모델명', 'specification'], ['단위', 'unit'],
+    ['품목명', 'itemName'], ['세부 사항', 'specification'], ['단위', 'unit'],
     ['거래처', 'customer'], ['작성일', 'date'], ['수량', 'quantity'],
     ['단가', 'unitPrice'], ['통화', 'currency'], ['금액', 'amount'], ['견적번호', 'quoteId'],
   ];
@@ -100,7 +99,7 @@ function StatCard({ label, value, currency }) {
   return <div className="price-stat"><small>{label}</small><b>{value == null ? '—' : formatPrice(value, currency)}</b></div>;
 }
 
-function PriceTrend({ rows, currency }) {
+function PriceTrend({ rows }) {
   const values = rows.map((row) => Number(row.unitPrice)).filter(Number.isFinite);
   if (!values.length) return <div className="trend-empty">비교할 단가 이력이 없습니다.</div>;
   const width = 440; const height = 150; const left = 48; const right = 12; const top = 12; const bottom = 28;
@@ -118,11 +117,10 @@ function PriceTrend({ rows, currency }) {
       <polyline points={points} className="chart-line" />
       {values.map((value, index) => <g key={`${value}-${index}`}><circle cx={x(index)} cy={y(value)} r="3.5" className="chart-point" /><text x={x(index)} y={height - 7} textAnchor="middle" className="chart-x-label">{labels[index]}</text></g>)}
     </svg>
-    <span className="chart-currency">{currency || '통화 미기재'}</span>
   </div>;
 }
 
-export default function PriceComparison({ onNotify }) {
+export default function PriceComparison({ onNotify, onOpenQuote, refreshKey = 0 }) {
   const [keyword, setKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
   const [apiRows, setApiRows] = useState([]);
@@ -168,7 +166,7 @@ export default function PriceComparison({ onNotify }) {
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [submittedKeyword, retry]);
+  }, [submittedKeyword, retry, refreshKey]);
 
   const sourceRows = apiRows || demoRows;
   const customers = useMemo(() => [...new Set(sourceRows.map((row) => row.customer).filter((value) => value && value !== '거래처 미기재'))].sort(), [sourceRows]);
@@ -190,11 +188,31 @@ export default function PriceComparison({ onNotify }) {
       return String(b.date).localeCompare(String(a.date));
     });
   }, [sourceRows, customerFilter, unitFilter, currencyFilter, periodFilter, sort]);
-  const selected = filteredRows.find((row) => row.itemId === selectedKey) || null;
+  const summaryRows = useMemo(() => {
+    const grouped = new Map();
+    filteredRows.forEach((row) => {
+      const key = `${row.itemName}\u0000${row.specification}\u0000${row.unit}\u0000${row.currency}`;
+      const group = grouped.get(key) || { key, itemName: row.itemName, lowest: null, latestDate: '' };
+      if (row.date && row.date > group.latestDate) group.latestDate = row.date;
+      if (row.unitPrice !== null && (!group.lowest || toScaledPrice(row.unitPrice) < toScaledPrice(group.lowest.unitPrice)
+        || (toScaledPrice(row.unitPrice) === toScaledPrice(group.lowest.unitPrice) && String(row.date).localeCompare(String(group.lowest.date)) > 0))) {
+        group.lowest = row;
+      }
+      grouped.set(key, group);
+    });
+    return [...grouped.values()].filter((group) => group.lowest)
+      .sort((a, b) => sort === '최저 단가순'
+        ? toScaledPrice(a.lowest.unitPrice) < toScaledPrice(b.lowest.unitPrice) ? -1 : toScaledPrice(a.lowest.unitPrice) > toScaledPrice(b.lowest.unitPrice) ? 1 : a.itemName.localeCompare(b.itemName, 'ko')
+        : sort === '최고 단가순'
+          ? toScaledPrice(a.lowest.unitPrice) > toScaledPrice(b.lowest.unitPrice) ? -1 : toScaledPrice(a.lowest.unitPrice) < toScaledPrice(b.lowest.unitPrice) ? 1 : a.itemName.localeCompare(b.itemName, 'ko')
+          : String(b.latestDate).localeCompare(String(a.latestDate)) || a.itemName.localeCompare(b.itemName, 'ko'));
+  }, [filteredRows, sort]);
+  const selectedSummary = summaryRows.find((row) => row.key === selectedKey) || null;
+  const selected = selectedSummary?.lowest || null;
   const comparableRows = useMemo(() => exactPriceRows(filteredRows, selected).sort((a, b) => String(a.date).localeCompare(String(b.date))), [filteredRows, selected]);
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const pageRows = filteredRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const selectedRows = filteredRows.filter((row) => checkedKeys.includes(row.itemId));
+  const pageCount = Math.max(1, Math.ceil(summaryRows.length / PAGE_SIZE));
+  const pageRows = summaryRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const selectedRows = summaryRows.filter((row) => checkedKeys.includes(row.key)).map((row) => row.lowest);
   const selectedQuoteIds = [...new Set(selectedRows.map((row) => row.quoteId).filter(Boolean))].slice(0, 10);
 
   useEffect(() => {
@@ -214,9 +232,9 @@ export default function PriceComparison({ onNotify }) {
   const summaryCurrency = selected?.currency || '';
   const offset = page * PAGE_SIZE;
 
-  const submitSearch = (event) => { event.preventDefault(); if (!keyword.trim()) return; setPage(0); setSelectedKey(''); setCheckedKeys([]); setSubmittedKeyword(keyword.trim()); };
-  const selectRow = (row) => setSelectedKey((current) => current === row.itemId ? '' : row.itemId);
-  const toggleChecked = (row) => setCheckedKeys((current) => current.includes(row.itemId) ? current.filter((key) => key !== row.itemId) : [...current, row.itemId]);
+  const submitSearch = (event) => { event.preventDefault(); setPage(0); setSelectedKey(''); setCheckedKeys([]); setSubmittedKeyword(keyword.trim()); };
+  const selectRow = (row) => setSelectedKey((current) => current === row.key ? '' : row.key);
+  const toggleChecked = (row) => setCheckedKeys((current) => current.includes(row.key) ? current.filter((key) => key !== row.key) : [...current, row.key]);
   const applyPriceToDraft = async () => {
     if (!selected?.quoteId || isDemo) { onNotify?.('실제 백엔드 이력에서 품목을 선택한 뒤 적용해 주세요.'); return; }
     if (selected.unitPrice === null) { onNotify?.('선택한 이력에는 단가가 없어 새 견적에 적용할 수 없습니다.'); return; }
@@ -264,27 +282,27 @@ export default function PriceComparison({ onNotify }) {
 
     <div className={`comparison-content-grid ${selected ? 'has-selection' : ''}`}>
       <section className="history-panel">
-        <div className="history-panel-heading"><h2>검색 결과 <strong>{loading ? '…' : isDemo ? `${filteredRows.length}건` : `${filteredRows.length}${apiTotal > 100 ? ` / ${apiTotal}` : ''}건`}</strong></h2><div className="history-table-actions"><label className="sort-control"><span>정렬</span><span className="select-wrap"><select value={sort} onChange={(event) => { setSort(event.target.value); setPage(0); }}><option>최신순</option><option>최저 단가순</option><option>최고 단가순</option></select><ChevronDown /></span></label><button className="secondary-button export-button" type="button" onClick={() => downloadHistory(filteredRows)} disabled={!filteredRows.length}><Download />CSV 다운로드</button></div></div>
+        <div className="history-panel-heading"><h2>검색 결과 <strong>{loading ? '…' : `${summaryRows.length}개 품목`}</strong></h2><div className="history-table-actions"><label className="sort-control"><span>정렬</span><span className="select-wrap"><select value={sort} onChange={(event) => { setSort(event.target.value); setPage(0); }}><option>최신순</option><option>최저 단가순</option><option>최고 단가순</option></select><ChevronDown /></span></label><button className="secondary-button export-button" type="button" onClick={() => downloadHistory(filteredRows)} disabled={!filteredRows.length}><Download />CSV 다운로드</button></div></div>
         {apiTotal > sourceRows.length && !isDemo && <div className="history-limit-note">검색 결과가 많아 최근 100건만 불러왔습니다. 검색어를 더 구체적으로 입력해 주세요.</div>}
-        <div className="table-scroll"><table className="price-history-table"><thead><tr><th className="check-col"><input type="checkbox" aria-label="현재 페이지 전체 선택" checked={pageRows.length > 0 && pageRows.every((row) => checkedKeys.includes(row.itemId))} onChange={(event) => setCheckedKeys((current) => event.target.checked ? [...new Set([...current, ...pageRows.map((row) => row.itemId)])] : current.filter((key) => !pageRows.some((row) => row.itemId === key)))} /></th><th>품목명</th><th>규격 / 모델명</th><th>단위</th><th>거래처</th><th>작성일</th><th>수량</th><th>단가</th><th>금액</th><th>견적번호</th></tr></thead><tbody>
-          {pageRows.map((row) => <tr key={row.itemId} className={selected?.itemId === row.itemId ? 'selected' : ''} onClick={() => selectRow(row)}><td className="check-col" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${row.itemName} ${row.quoteId} 비교 선택`} checked={checkedKeys.includes(row.itemId)} onChange={() => toggleChecked(row)} /></td><td>{row.itemName}</td><td>{row.specification}</td><td>{row.unit}</td><td>{row.customer}</td><td>{formatDate(row.date)}</td><td>{row.quantity || '미기재'}</td><td className="price-number">{formatPrice(row.unitPrice, row.currency)}</td><td className="price-number">{formatPrice(row.amount, row.currency)}</td><td>{row.quoteId || '—'}</td></tr>)}
-        </tbody></table>{loading && <div className="comparison-loading"><LoaderCircle className="spin" />단가 이력을 불러오고 있습니다.</div>}{!loading && pageRows.length === 0 && <div className="comparison-loading">{error ? '예시 데이터를 표시 중입니다.' : '검색 결과가 없습니다. 품목명이나 규격으로 검색해 주세요.'}</div>}</div>
-        <div className="history-pagination"><label>페이지당 <select value={PAGE_SIZE} disabled><option value={PAGE_SIZE}>{PAGE_SIZE}개</option></select></label><div className="pagination-buttons"><button type="button" aria-label="이전 페이지" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}><ChevronLeft /></button><span>{page + 1} / {pageCount}</span><button type="button" aria-label="다음 페이지" disabled={page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)}><ChevronRight /></button></div><small>총 {filteredRows.length}건{!isDemo && apiTotal > sourceRows.length ? ` · 최근 ${sourceRows.length}건 범위` : ''}</small></div>
+        <div className="table-scroll"><table className="price-history-table"><thead><tr><th className="check-col"><input type="checkbox" aria-label="현재 페이지 전체 선택" checked={pageRows.length > 0 && pageRows.every((row) => checkedKeys.includes(row.key))} onChange={(event) => setCheckedKeys((current) => event.target.checked ? [...new Set([...current, ...pageRows.map((row) => row.key)])] : current.filter((key) => !pageRows.some((row) => row.key === key)))} /></th><th>품목명</th><th>최저 단가</th><th>거래처</th></tr></thead><tbody>
+          {pageRows.map((row) => <tr key={row.key} className={selectedSummary?.key === row.key ? 'selected' : ''} onClick={() => selectRow(row)}><td className="check-col" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${row.itemName} 비교 선택`} checked={checkedKeys.includes(row.key)} onChange={() => toggleChecked(row)} /></td><td>{row.itemName}</td><td className="price-number">{formatPrice(row.lowest.unitPrice, row.lowest.currency)}</td><td>{row.lowest.customer}</td></tr>)}
+        </tbody></table>{loading && <div className="comparison-loading"><LoaderCircle className="spin" />단가 이력을 불러오고 있습니다.</div>}{!loading && pageRows.length === 0 && <div className="comparison-loading">{error ? '예시 데이터를 표시 중입니다.' : '검색 결과가 없습니다. 품목명으로 검색해 주세요.'}</div>}</div>
+        <div className="history-pagination"><label>페이지당 <select value={PAGE_SIZE} disabled><option value={PAGE_SIZE}>{PAGE_SIZE}개</option></select></label><div className="pagination-buttons"><button type="button" aria-label="이전 페이지" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}><ChevronLeft /></button><span>{page + 1} / {pageCount}</span><button type="button" aria-label="다음 페이지" disabled={page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)}><ChevronRight /></button></div><small>총 {summaryRows.length}개 품목{!isDemo && apiTotal > sourceRows.length ? ` · 최근 ${sourceRows.length}건 범위` : ''}</small></div>
       </section>
 
       {selected && <aside className="comparison-side-column">
         <section className="selected-item-panel">
           {selected ? <>
-            <div className="selected-item-heading"><div><span>{selected.itemName}</span><b>{selected.specification}</b></div><div className="unit-tag">단위&nbsp; {selected.unit}</div></div>
+            <div className="selected-item-heading"><div><span>{selected.itemName}</span><b>{formatDetails(selected.specification).map((line, index) => <React.Fragment key={`${index}-${line}`}>{index > 0 && <br />}{line}</React.Fragment>)}</b></div></div>
             <button className="apply-price-button" type="button" disabled={applyingPrice} onClick={applyPriceToDraft}>{applyingPrice ? <LoaderCircle className="spin" /> : <Plus />}{applyingPrice ? '초안 생성 중' : '새 견적에 적용'}</button>
             <div className="price-stats-grid"><StatCard label="평균 단가" value={average} currency={summaryCurrency} /><StatCard label="최저 단가" value={minimum} currency={summaryCurrency} /><StatCard label="최고 단가" value={maximum} currency={summaryCurrency} /></div>
-            <div className="trend-heading"><h3>단가 추이</h3><span className="select-wrap"><select aria-label="단가 추이 기간" value={periodFilter} onChange={(event) => { setPeriodFilter(event.target.value); setPage(0); }}><option>전체 기간</option><option value="3">최근 3개월</option><option value="6">최근 6개월</option><option value="12">최근 1년</option><option value="36">최근 3년</option></select><ChevronDown /></span></div>
-            <PriceTrend rows={comparableRows} currency={summaryCurrency} />
+            <div className="trend-heading"><h3>단가 추이</h3><div className="trend-controls"><span className="trend-currency">{summaryCurrency || '통화 미기재'}</span><span className="select-wrap"><select aria-label="단가 추이 기간" value={periodFilter} onChange={(event) => { setPeriodFilter(event.target.value); setPage(0); }}><option>전체 기간</option><option value="3">최근 3개월</option><option value="6">최근 6개월</option><option value="12">최근 1년</option><option value="36">최근 3년</option></select><ChevronDown /></span></div></div>
+            <PriceTrend rows={comparableRows} />
           </> : <div className="selected-empty">품목을 검색하면 단가 요약과 추이를 볼 수 있습니다.</div>}
         </section>
 
         <section className="recent-history-panel"><div className="recent-history-heading"><h2>최근 견적 이력</h2><span>{selected.itemName}</span></div>
-          {selected && <div className="recent-history-table-wrap"><table className="recent-history-table"><thead><tr><th>작성일</th><th>거래처</th><th>수량</th><th>단가</th><th>상태</th></tr></thead><tbody>{[...comparableRows].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5).map((row) => <tr key={row.itemId}><td>{formatDate(row.date)}</td><td>{row.customer}</td><td>{row.quantity || '—'}</td><td>{formatPrice(row.unitPrice, row.currency)}</td><td><span className={`mini-status ${row.status === 'confirmed' ? 'done' : ''}`}>{statusLabels[row.status] || (isDemo ? '완료' : '—')}</span></td></tr>)}</tbody></table></div>}
+          {selected && <div className="recent-history-table-wrap"><table className="recent-history-table"><thead><tr><th>견적번호</th><th>작성일</th><th>거래처</th><th>수량</th><th>단가</th><th>상태</th></tr></thead><tbody>{[...comparableRows].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5).map((row) => <tr key={row.itemId}><td>{row.quoteId && !isDemo ? <button type="button" className="history-quote-link" onClick={() => onOpenQuote?.(row.quoteId, row.quoteNumber)}>{row.quoteNumber}</button> : row.quoteNumber || '—'}</td><td>{formatDate(row.date)}</td><td>{row.customer}</td><td>{row.quantity || '—'}</td><td>{formatPrice(row.unitPrice, row.currency)}</td><td><span className={`mini-status ${row.status === 'confirmed' ? 'done' : ''}`}>{statusLabels[row.status] || (isDemo ? '완료' : '—')}</span></td></tr>)}</tbody></table></div>}
           {selectedRows.length > 0 && <div className="compare-feedback">{selectedQuoteIds.length < 2 ? '비교하려면 서로 다른 견적 이력 2건 이상을 선택하세요.' : compareError ? compareError : compareResult ? <><b>{compareStatusText}</b><span>{compareResult.pairs?.length || 0}개 조합 · {compareResult.excluded_rows?.length || 0}개 비교 제외</span></> : '선택한 견적의 비교 조건을 확인하고 있습니다.'}</div>}
           {isDemo && <p className="demo-caption"><FileSpreadsheet />시안 예시 데이터 · 실제 견적 정보가 아닙니다.</p>}
         </section>

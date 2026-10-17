@@ -13,6 +13,9 @@
 .all-quotes-page .list-count span{font-size:13px;color:#73839a}
 .all-quotes-page .list-filters{display:flex;align-items:center;gap:10px;min-width:0}
 .all-quotes-page .list-register-button{height:42px;flex:0 0 auto;padding:0 16px;white-space:nowrap}
+.all-quotes-page .delete-selected-button{height:42px;display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;padding:0 13px;border:1px solid #315f94;background:#fff;color:#244f80;font-size:13px;white-space:nowrap}
+.all-quotes-page .delete-selected-button svg{width:16px;height:16px}
+.all-quotes-page .delete-selected-button:disabled{opacity:.55;cursor:wait}
 .all-quotes-page .list-search{width:min(370px,32vw);height:42px}
 .all-quotes-page .list-search{background:#fff}
 .all-quotes-page .list-search input{font-size:13px}
@@ -20,6 +23,10 @@
 .all-quotes-page .status-filter>svg:first-child{width:16px;height:16px}
 .all-quotes-page .status-filter>svg:last-child{width:14px;height:14px;margin-left:auto}
 .all-quotes-page .status-filter select{width:100%;border:0;outline:0;appearance:none;background:transparent;color:#4b5e77;font-size:13px}
+.all-quotes-page .direction-filter{min-width:145px}
+.all-quotes-page .direction-pill{display:inline-flex;align-items:center;min-height:25px;padding:0 9px;background:#eef2f7;color:#526783;font-size:11px;white-space:nowrap}
+.all-quotes-page .direction-pill.received{background:#e9f1fb;color:#315f94}
+.all-quotes-page .direction-pill.sent{background:#edf3ed;color:#477250}
 .all-quotes-page .all-quotes-table{table-layout:auto}
 .all-quotes-page .all-quotes-table thead{background:#fff}
 .all-quotes-page .all-quotes-table th:first-child,.all-quotes-page .all-quotes-table td:first-child{padding-left:26px}
@@ -39,4 +46,4 @@
 .all-quotes-page .pagination button svg{width:17px;height:17px}
 .all-quotes-page .page-indicator{min-width:56px;text-align:center;color:#415773}
 @media(max-width:900px){.all-quotes-page .all-quotes-toolbar{align-items:flex-start;flex-direction:column;padding:17px 0}.all-quotes-page .list-filters{width:100%}.all-quotes-page .list-search{width:auto;flex:1}.all-quotes-page .status-filter{min-width:145px}.all-quotes-page .all-quotes-table td{height:66px}.all-quotes-page .quote-subtitle{max-width:190px}.all-quotes-page .api-error{flex-wrap:wrap}.all-quotes-page .api-error b{white-space:normal}}
-@media(max-width:600px){.all-quotes-page .all-quotes-toolbar{gap:13px;padding:14px 0}.all-quotes-page .list-count b{font-size:14px}.all-quotes-page .list-filters{gap:7px;flex-wrap:wrap}.all-quotes-page .list-search{height:38px;min-width:0;flex:1 1 100%}.all-quotes-page .list-search input{font-size:11px}.all-quotes-page .status-filter{height:38px;min-width:118px;padding:0 8px;gap:5px;flex:1}.all-quotes-page .status-filter select{font-size:11px}.all-quotes-page .list-register-button{height:38px;padding:0 10px;font-size:11px}.all-quotes-page .all-quotes-table .check-col{width:38px}.all-quotes-page .all-quotes-table th:first-child,.all-quotes-page .all-quotes-table td:first-child{padding-left:12px}.all-quotes-page .all-quotes-table th{font-size:10px}.all-quotes-page .all-quotes-table td{height:62px;font-size:11px}.all-quotes-page .all-quotes-table th,.all-quotes-page .all-quotes-table td{padding-inline:7px}.all-quotes-page .all-quotes-table .quote-id,.all-quotes-page .all-quotes-table .client-name{font-size:11px}.all-quotes-page .quote-subtitle{max-width:120px;font-size:9px}.all-quotes-page .all-quotes-table .status-pill{min-width:74px;font-size:9px;padding:0 6px}.all-quotes-page .all-quotes-table .amount-cell{font-size:10px}.all-quotes-page .pagination{min-height:58px}.all-quotes-page .pagination button{width:30px;height:30px}.all-quotes-page .api-error span{flex-basis:100%}}
+@media(max-width:600px){.all-quotes-page .all-quotes-toolbar{gap:13px;padding:14px 0}.all-quotes-page .list-count b{font-size:14px}.all-quotes-page .list-filters{gap:7px;flex-wrap:wrap}.all-quotes-page .list-search{height:38px;min-width:0;flex:1 1 100%}.all-quotes-page .list-search input{font-size:11px}.all-quotes-page .status-filter{height:38px;min-width:118px;padding:0 8px;gap:5px;flex:1}.all-quotes-page .status-filter select{font-size:11px}.all-quotes-page .delete-selected-button{height:38px;padding:0 9px;font-size:11px}.all-quotes-page .list-register-button{height:38px;padding:0 10px;font-size:11px}.all-quotes-page .all-quotes-table .check-col{width:38px}.all-quotes-page .all-quotes-table th:first-child,.all-quotes-page .all-quotes-table td:first-child{padding-left:12px}.all-quotes-page .all-quotes-table th{font-size:10px}.all-quotes-page .all-quotes-table td{height:62px;font-size:11px}.all-quotes-page .all-quotes-table th,.all-quotes-page .all-quotes-table td{padding-inline:7px}.all-quotes-page .all-quotes-table .quote-id,.all-quotes-page .all-quotes-table .client-name{font-size:11px}.all-quotes-page .quote-subtitle{max-width:120px;font-size:9px}.all-quotes-page .all-quotes-table .status-pill{min-width:74px;font-size:9px;padding:0 6px}.all-quotes-page .all-quotes-table .amount-cell{font-size:10px}.all-quotes-page .pagination{min-height:58px}.all-quotes-page .pagination button{width:30px;height:30px}.all-quotes-page .api-error span{flex-basis:100%}}

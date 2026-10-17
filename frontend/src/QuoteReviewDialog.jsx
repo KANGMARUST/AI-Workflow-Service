@@ -10,7 +10,7 @@ const basicFields = [
 ];
 const moneyFields = [['currency', '통화'], ['subtotal', '공급가액', 'number'], ['tax_amount', '세액', 'number'], ['total_amount', '총액', 'number'], ['tax_rate', '세율', 'number']];
 const conditionFields = [['tax_terms', '세금 조건'], ['discount_terms', '할인 조건'], ['payment_terms', '결제 조건'], ['delivery_terms', '납품 조건'], ['notes', '비고'], ['review_note', '검토 메모']];
-const itemFields = [['item_name', '품목명'], ['specification', '규격'], ['unit', '단위'], ['quantity', '수량', 'number'], ['unit_price', '단가', 'number'], ['amount', '금액', 'number'], ['currency', '통화']];
+const itemFields = [['item_name', '품목명'], ['specification', '세부 사항'], ['unit', '단위'], ['quantity', '수량', 'number'], ['unit_price', '단가', 'number'], ['amount', '금액', 'number'], ['currency', '통화']];
 const editableFields = [...basicFields, ...moneyFields, ...conditionFields, ['tax_basis']];
 const statusNames = { review_required: '검토 미완료', confirmed: '검토 완료', extracting: '추출 중', rejected: '반려', archived: '보관' };
 const text = (value) => value == null ? '' : String(value);
@@ -96,6 +96,17 @@ export default function QuoteReviewDialog({ quoteId, onClose, onSaved, onNotify 
     finally { busy.current = false; setSaving(false); }
   };
 
+  const saveDirection = async (direction) => {
+    if (busy.current || dirty || direction === (quote.direction || '')) return;
+    busy.current = true; setSaving(true); setError('');
+    try {
+      const saved = await requestQuote(`/edit/${encodeURIComponent(quoteId)}`, { method: 'PATCH', body: JSON.stringify({ direction: direction || null, expected_version: quote.version }) });
+      setQuote(saved); setForm(makeForm(saved));
+      onSaved(); onNotify('견적서 구분을 저장했습니다.');
+    } catch (reason) { setError(reason.message); }
+    finally { busy.current = false; setSaving(false); }
+  };
+
   const complete = async () => {
     if (busy.current || dirty || !acknowledged || !canEdit) return;
     busy.current = true; setSaving(true); setError('');
@@ -129,7 +140,7 @@ export default function QuoteReviewDialog({ quoteId, onClose, onSaved, onNotify 
       {error && <div ref={errorBox} className="quote-review-error" role="alert"><span>{error}</span><button type="button" disabled={saving} onClick={() => { if (!dirty || window.confirm('수정 내용을 버리고 최신 정보를 불러올까요?')) setReload((value) => value + 1); }}>최신 정보 다시 불러오기</button></div>}
       {quote && form && <form onSubmit={save}>
         <div className="quote-review-body">
-          <div className="quote-review-summary"><span className={`status-pill ${quote.status === 'confirmed' ? 'complete' : 'pending'}`}>{statusNames[quote.status] || quote.status}</span><button type="button" className="secondary-button" disabled={downloading || saving} onClick={download}>{downloading ? <LoaderCircle className="spin" /> : <Download />}원본 다운로드</button></div>
+          <div className="quote-review-summary"><span className={`status-pill ${quote.status === 'confirmed' ? 'complete' : 'pending'}`}>{statusNames[quote.status] || quote.status}</span><label className="quote-direction-control">견적서 구분<select aria-label="견적서 구분 변경" value={quote.direction || ''} disabled={saving || dirty} onChange={(event) => saveDirection(event.target.value)}><option value="">미분류</option><option value="received">받은 견적서</option><option value="sent">보낸 견적서</option></select></label><button type="button" className="secondary-button" disabled={downloading || saving} onClick={download}>{downloading ? <LoaderCircle className="spin" /> : <Download />}원본 다운로드</button></div>
           {!canEdit && quote.status !== 'confirmed' && <p className="quote-review-hint">현재 상태에서는 내용을 확인할 수 있습니다. 추출 중인 견적서는 추출 완료 후 검토해 주세요.</p>}
           <fieldset disabled={saving || !canEdit}><legend>기본 정보</legend><div className="quote-review-grid">{basicFields.map(renderField)}</div></fieldset>
           <fieldset disabled={saving || !canEdit}><legend>품목 <small>{form.items.length}개 · 금액은 원본 기준으로 확인해 주세요.</small></legend>

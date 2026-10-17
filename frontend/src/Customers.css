@@ -74,6 +74,7 @@
 .customers-page .customer-quotes>div:not(.customer-empty){padding:0 1px}
 .customers-page .customer-quotes article{min-height:34px;display:grid;grid-template-columns:1.2fr .9fr 1.1fr auto;align-items:center;gap:7px;border-top:1px solid #edf0f4;color:#536985;font-size:9px}
 .customers-page .customer-quotes article b{font-weight:500;color:#344f70}
+.customers-page .customer-quotes article .customer-quote-link{padding:0;border:0;background:transparent;color:#24588d;font:inherit;text-align:left;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 .customers-page .customer-quotes article em{justify-self:end;padding:3px 7px;border-radius:10px;background:#e9edf2;color:#77879a;font-size:8px;font-style:normal}
 .customers-page .customer-quotes article em.done{background:#1e4d80;color:#fff}
 .customers-page .customer-empty{min-height:115px;display:flex;align-items:center;justify-content:center;gap:8px;color:#8794a6;font-size:11px}

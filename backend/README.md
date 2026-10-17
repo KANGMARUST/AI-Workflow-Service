@@ -117,7 +117,7 @@ PATCH 미전달 필드는 유지하고 명시적인 null은 지운다. `items`�
 - 라벨은 기존 DB의 `quotes.payload.direction`에 저장하므로 테이블 변경이나 기존 데이터 migration은 필요 없다. `GET /api/cards?direction=received`, `POST /api/search`의 `direction` 조건으로 필터링한다. 같은 원본의 기존 라벨과 다른 라벨을 지정해 중복 업로드하면 409이며 기존 견적을 PATCH로 수정한다.
 - `validity_terms`: “견적일로부터 7일” 같은 유효기간 원문. 확정 날짜가 있으면 `valid_until`에도 저장한다. 상대 기간을 임의의 만료일로 바꾸지 않는다.
 - `delivery_period`: “발주 후 4주”, “일정협의” 같은 납기 원문. `delivery_date`는 확정 납기일이며 `delivery_terms`는 납품 장소·인도조건이다.
-- 상세·목록의 읽기 전용 `quoted_amount`는 명시된 `total_amount`를 우선하고, 없으면 `subtotal`을 반환한다. 프론트 연동 시 이를 견적금액으로 표시하고 공급가액 사용 여부를 함께 표시해야 한다. VAT 별도 합계를 세금 포함 총액으로 바꾸지 않는다. 옵션 선택형 문서에 숫자 합계가 없으면 금액은 null이다.
+- 저장 시 `total_amount`가 없고 `subtotal`만 추출된 경우 그 값을 `total_amount`로 옮기고 `subtotal`은 비운다. 기존 데이터도 초기화 시 같은 방식으로 정리한다. 상세·목록의 `quoted_amount`는 `total_amount`를 기준으로 반환한다. 추출된 금액을 화면과 검색에서 총액으로 일관되게 사용한다.
 - `validity_terms`, `delivery_period`는 수정 및 PDF/XLSX 출력에도 반영한다. 과거 추출 결과에 없는 새 필드는 원본을 재추출해야 저장된다.
 
 프론트엔드는 별도 담당 범위다. 업로드·수정 화면의 `direction` 선택, 목록의 라벨·`quoted_amount` 표시, 상세의 `validity_terms`·`delivery_period` 표시는 프론트 담당자가 위 계약에 맞춰 연결해야 한다.

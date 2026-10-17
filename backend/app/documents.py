@@ -391,7 +391,7 @@ def agent_input(title, data, custom_font=None):
     return make_pdf(title, json.dumps(data, ensure_ascii=False, indent=2, default=str).splitlines(), custom_font)
 
 
-EXPORT_LABELS = {"currency": "통화", "subtotal": "공급가액", "tax_rate": "세율 (%)", "tax_terms": "세금 조건", "tax_amount": "부가세", "total_amount": "세금 포함 총액", "validity_terms": "유효기간 조건", "delivery_period": "납기 조건", "payment_terms": "결제 조건", "delivery_terms": "납품 조건", "discount_terms": "할인 조건", "notes": "비고"}
+EXPORT_LABELS = {"currency": "통화", "subtotal": "공급가액", "tax_rate": "세율 (%)", "tax_terms": "세금 조건", "tax_amount": "부가세", "total_amount": "총액", "validity_terms": "유효기간 조건", "delivery_period": "납기 조건", "payment_terms": "결제 조건", "delivery_terms": "납품 조건", "discount_terms": "할인 조건", "notes": "비고"}
 STATUS_LABELS = {"review_required": "확인 필요", "extracting": "추출 중", "confirmed": "검토 완료", "rejected": "반려", "archived": "보관"}
 DIRECTION_LABELS = {"sent": "보낸 견적서", "received": "받은 견적서"}
 

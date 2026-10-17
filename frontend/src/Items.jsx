@@ -7,27 +7,17 @@ const rawPrefix = (import.meta.env.VITE_API_PREFIX || '/api').replace(/\/$/, '')
 const API_PREFIX = rawPrefix.startsWith('/') ? rawPrefix : `/${rawPrefix}`;
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
-const demoItems = [
-  ['지그', 'JIG-A100', '자동화 부품', 'EA', '1,250,000', '2025-04-21', 5, '사용중', '자동화 라인용 지그'],
-  ['센서 모듈', 'SEN-200', '전기/전자 부품', 'EA', '350,000', '2025-03-10', 3, '사용중', '산업용 센서 모듈'],
-  ['알루미늄 프로파일', 'AL-4040', '구조재', 'M', '28,000', '2025-02-18', 4, '사용중', '알루미늄 프레임용 프로파일'],
-  ['컨트롤러', 'CON-300', '전기/전자 부품', 'EA', '820,000', '2024-12-05', 3, '사용중', '설비 제어용 컨트롤러'],
-  ['서보모터', 'SV-100W', '구동 부품', 'EA', '680,000', '2024-11-22', 4, '사용중', '정밀 구동용 서보모터'],
-  ['타이밍 벨트', 'TB-10', '전달 부품', 'EA', '45,000', '2024-10-14', 2, '사용중', '동력 전달용 벨트'],
-  ['베어링', 'BR-6203', '전달 부품', 'EA', '12,000', '2024-09-30', 6, '사용중', '깊은 홈 볼베어링'],
-  ['케이블', 'CB-4P', '전기/전자 부품', 'M', '3,500', '2024-08-19', 4, '사용중', '4심 제어 케이블'],
-  ['커넥터', 'CN-04', '전기/전자 부품', 'EA', '9,800', '2024-07-11', 3, '사용중', '4핀 방수 커넥터'],
-  ['브라켓', 'BK-100', '구조재', 'EA', '15,000', '2024-06-28', 5, '미사용', '장비 고정용 브라켓'],
-];
-const demoHistory = [
-  { date: '2025-04-21', customer: '㈜한빛테크', price: '1,250,000', quantity: '10', quote: 'Q-2025-00123' },
-  { date: '2025-03-10', customer: '삼성전자㈜', price: '1,180,000', quantity: '10', quote: 'Q-2025-00098' },
-  { date: '2024-11-05', customer: '㈜미래솔루션', price: '1,100,000', quantity: '20', quote: 'Q-2024-00756' },
-  { date: '2024-08-14', customer: 'LG디스플레이㈜', price: '1,300,000', quantity: '10', quote: 'Q-2024-00532' },
-  { date: '2024-06-22', customer: '㈜현대엔지니어링', price: '1,350,000', quantity: '5', quote: 'Q-2024-00411' },
-];
 const fmtDate = (value) => value ? String(value).slice(0, 10).replaceAll('-', '.') : '—';
 const fmtPrice = (value) => value == null || value === '' ? '—' : new Intl.NumberFormat('ko-KR').format(Number(String(value).replaceAll(',', '')) || 0);
+const formatDetails = (value) => String(value || '')
+  .split(/\s*-\.\s*/)
+  .flatMap((part) => part
+    .replace(/,\s*(?=(?:명암비\s|HDMI(?:\s|×)|스위블\s*[,]))/gi, '\n')
+    .replace(/\s+(?=(?:SSD|HDD|Display|O\/S|Warranty)\s*:)/gi, '\n')
+    .replace(/\s*\.\s*(?=HDMI\s+\d+\s*M?\s*케이블)/gi, '\n')
+    .split('\n'))
+  .map((line) => line.trim().replace(/^[,;]+|[,;]+$/g, '').trim())
+  .filter(Boolean);
 
 async function api(path, options = {}) {
   const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
@@ -46,7 +36,7 @@ function groupQuoteItems(quotes) {
     const spec = line.specification || '';
     const unit = line.unit || '';
     const key = `${name}\u0000${spec}\u0000${unit}`;
-    const history = { date: quote.issue_date, customer: quote.customer_name || '거래처 미기재', price: line.unit_price, quantity: line.quantity, quote: quote.quote_number || quote.quote_id, status: quote.status, currency: line.currency || quote.currency };
+    const history = { date: quote.issue_date, customer: quote.customer_name || '거래처 미기재', price: line.unit_price, quantity: line.quantity, quote: quote.quote_number || quote.quote_id, quoteId: quote.quote_id, status: quote.status, currency: line.currency || quote.currency };
     const item = grouped.get(key) || { id: key, name, spec, category: '미분류', unit: unit || '—', price: null, recentDate: '', customers: new Set(), status: '정보 미등록', description: '', createdDate: '', updatedDate: '', registeredBy: '—', history: [] };
     item.history.push(history);
     item.customers.add(history.customer);
@@ -73,7 +63,7 @@ function ItemForm({ initial, onClose, onSave }) {
   </form></section></div>;
 }
 
-export default function Items({ onNotify }) {
+export default function Items({ onNotify, onOpenQuote, refreshKey = 0 }) {
   const [items, setItems] = useState([]);
   const [demo, setDemo] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -101,7 +91,7 @@ export default function Items({ onNotify }) {
       .catch((reason) => { if (reason.name !== 'AbortError') { setItems(demoItems.map(([name, spec, category, unit, price, recentDate, customers, status, description], index) => ({ id: `demo-${index}`, name, spec, category, unit, price, recentDate, customers, status, description, createdDate: '2023-05-12', updatedDate: recentDate, registeredBy: '김담당', currency: 'KRW', history: index === 0 ? demoHistory : [] }))); setDemo(true); setError(reason.message || '품목 정보를 불러오지 못했습니다.'); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [retry]);
+  }, [retry, refreshKey]);
 
   const categories = [...new Set(items.map((item) => item.category).filter(Boolean))];
   const units = [...new Set(items.map((item) => item.unit).filter(Boolean))];
@@ -109,7 +99,8 @@ export default function Items({ onNotify }) {
   const filtered = useMemo(() => items.filter((item) => `${item.name} ${item.spec}`.toLowerCase().includes(search.trim().toLowerCase()) && (category === '전체' || item.category === category) && (unit === '전체' || item.unit === unit) && (customer === '전체' || item.history.some((row) => row.customer === customer))).sort((a, b) => sort === '품목명순' ? a.name.localeCompare(b.name, 'ko') : String(b.recentDate).localeCompare(String(a.recentDate))), [items, search, category, unit, customer, sort]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const selected = filtered.find((item) => item.id === selectedId) || null;
+  const selected = filtered.find((item) => item.id === selectedId) || filtered[0] || null;
+  const selectedDetails = formatDetails(selected?.spec);
   const visibleHistory = selected?.history || [];
   const reset = () => { setSearch(''); setCategory('전체'); setUnit('전체'); setCustomer('전체'); setPage(0); };
   const saveItem = (value) => {
@@ -121,8 +112,8 @@ export default function Items({ onNotify }) {
   return <section className="items-page">
     {error && <div className="item-api-notice"><span>{demo ? '백엔드에 연결하지 못해 시안 예시 데이터를 표시 중입니다.' : error}</span><button onClick={() => setRetry((value) => value + 1)}>다시 연결</button></div>}
     <form className="panel item-filters" onSubmit={(event) => { event.preventDefault(); setPage(0); }}><label className="item-search"><b>품목 검색</b><span><Search /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="품목명, 규격, 모델명으로 검색하세요." /></span></label><label><b>품목 분류</b><span className="item-select"><select value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}><option>전체</option>{categories.filter((value) => value !== '미분류').map((value) => <option key={value}>{value}</option>)}</select><ChevronDown /></span></label><label><b>단위</b><span className="item-select"><select value={unit} onChange={(event) => { setUnit(event.target.value); setPage(0); }}><option>전체</option>{units.filter((value) => value !== '—').map((value) => <option key={value}>{value}</option>)}</select><ChevronDown /></span></label><label><b>거래처</b><span className="item-select"><select value={customer} onChange={(event) => { setCustomer(event.target.value); setPage(0); }}><option>전체</option>{customers.map((value) => <option key={value}>{value}</option>)}</select><ChevronDown /></span></label><div className="item-filter-actions"><button type="button" className="item-reset" onClick={reset}><RotateCcw />초기화</button><button type="button" className="primary-button item-add-button" onClick={() => setModal({ initial: null })}><Plus />품목 등록</button></div></form>
-    <div className={`items-layout ${selected ? 'has-selection' : ''}`}><section className="panel item-list"><header><h2>품목 목록 <small>총 {loading ? '…' : `${demo ? 128 : filtered.length}${demo ? '건' : '건'}`}</small></h2><label className="item-sort"><select value={sort} onChange={(event) => setSort(event.target.value)}><option>최근 등록순</option><option>품목명순</option></select><ChevronDown /></label></header><div className="item-table-scroll"><table><thead><tr><th className="check-col"><input aria-label="현재 페이지 전체 선택" type="checkbox" onChange={(event) => setItems((current) => current.map((item) => pageItems.some((row) => row.id === item.id) ? { ...item, selected: event.target.checked } : item))} /></th><th>품목명</th><th>규격 / 모델명</th><th>분류</th><th>단위</th><th>최근 단가(원)</th><th>최근 견적일</th><th>거래처 수</th><th>상태</th><th /></tr></thead><tbody>{pageItems.map((item) => <tr key={item.id} className={selected?.id === item.id ? 'selected' : ''} onClick={() => setSelectedId(item.id)}><td className="check-col" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${item.name} 선택`} checked={Boolean(item.selected)} onChange={(event) => setItems((current) => current.map((row) => row.id === item.id ? { ...row, selected: event.target.checked } : row))} /></td><td className="item-name-cell">{item.name}</td><td>{item.spec || '—'}</td><td>{item.category}</td><td>{item.unit}</td><td className="item-price-cell">{fmtPrice(item.price)}</td><td>{fmtDate(item.recentDate)}</td><td>{item.customers}</td><td><span className={`item-status ${item.status === '사용중' ? 'in-use' : ''}`}>{item.status}</span></td><td><button className="item-row-menu" aria-label={`${item.name} 수정`} onClick={(event) => { event.stopPropagation(); setModal({ initial: item }); }}>···</button></td></tr>)}</tbody></table>{loading && <div className="item-empty"><LoaderCircle className="spin" />품목 이력을 불러오는 중입니다.</div>}{!loading && pageItems.length === 0 && <div className="item-empty">조건에 맞는 품목이 없습니다.</div>}</div><footer className="item-pagination"><span>페이지당 <select disabled><option>10개</option></select></span><div><button disabled={page === 0} aria-label="이전 페이지" onClick={() => setPage((value) => Math.max(0, value - 1))}><ChevronLeft /></button><b>{page + 1}</b><span>/ {pageCount}</span><button disabled={page + 1 >= pageCount} aria-label="다음 페이지" onClick={() => setPage((value) => value + 1)}><ChevronRight /></button></div><small>총 {demo ? '128' : filtered.length}건</small></footer></section>
-      {selected && <aside className="item-side"><section className="panel item-detail"><header><h2>품목 상세 정보</h2><button className="item-edit-button" onClick={() => setModal({ initial: selected })}>✎ 수정</button></header><div className="item-profile"><span><Box /></span><div><b>{selected.name}</b><em className={selected.status === '사용중' ? 'active' : ''}>{selected.status}</em><small>{selected.spec || '규격 정보 없음'}</small></div></div><dl><div><dt>품목 분류</dt><dd>{selected.category}</dd><dt>최초 등록일</dt><dd>{fmtDate(selected.createdDate)}</dd></div><div><dt>단위</dt><dd>{selected.unit}</dd><dt>최근 수정일</dt><dd>{fmtDate(selected.updatedDate || selected.recentDate)}</dd></div><div><dt>규격 / 모델명</dt><dd>{selected.spec || '—'}</dd><dt>거래처 수</dt><dd>{selected.customers}개</dd></div><div><dt>설명</dt><dd>{selected.description || '등록된 설명이 없습니다.'}</dd><dt>등록자</dt><dd>{selected.registeredBy || '—'}</dd></div></dl><section className="item-history"><header><h3>최근 단가 이력</h3><button onClick={() => onNotify?.('단가 비교 화면에서 품목 이력을 더 자세히 볼 수 있습니다.')}>전체보기 <ChevronRight /></button></header><div className="item-history-scroll"><table><thead><tr><th>작성일</th><th>거래처</th><th>단가(원)</th><th>수량</th><th>견적번호</th></tr></thead><tbody>{visibleHistory.slice(0, 5).map((row, index) => <tr key={`${row.quote}-${index}`}><td>{fmtDate(row.date)}</td><td>{row.customer}</td><td>{fmtPrice(row.price)}</td><td>{row.quantity ?? '—'}</td><td>{row.quote}</td></tr>)}</tbody></table>{!visibleHistory.length && <div className="item-history-empty">이 품목의 견적 단가 이력이 없습니다.</div>}</div></section></section></aside>}</div>
+    <div className={`items-layout ${selected ? 'has-selection' : ''}`}><section className="panel item-list"><header><h2>품목 목록 <small>총 {loading ? '…' : `${demo ? 128 : filtered.length}${demo ? '건' : '건'}`}</small></h2><label className="item-sort"><select value={sort} onChange={(event) => setSort(event.target.value)}><option>최근 등록순</option><option>품목명순</option></select><ChevronDown /></label></header><div className="item-table-scroll"><table><thead><tr><th className="check-col"><input aria-label="현재 페이지 전체 선택" onChange={(event) => setItems((current) => current.map((item) => pageItems.some((row) => row.id === item.id) ? { ...item, selected: event.target.checked } : item))} type="checkbox" /></th><th>품목명</th><th>최근 거래일</th><th>거래처</th><th /></tr></thead><tbody>{pageItems.map((item) => <tr key={item.id} className={selected?.id === item.id ? 'selected' : ''} onClick={() => setSelectedId(item.id)}><td className="check-col" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${item.name} 선택`} checked={Boolean(item.selected)} onChange={(event) => setItems((current) => current.map((row) => row.id === item.id ? { ...row, selected: event.target.checked } : row))} /></td><td className="item-name-cell">{item.name}</td><td>{fmtDate(item.history[0]?.date || item.recentDate)}</td><td>{item.history[0]?.customer || '—'}</td><td><button className="item-row-menu" aria-label={`${item.name} 수정`} onClick={(event) => { event.stopPropagation(); setModal({ initial: item }); }}>···</button></td></tr>)}</tbody></table>{loading && <div className="item-empty"><LoaderCircle className="spin" />품목 이력을 불러오는 중입니다.</div>}{!loading && pageItems.length === 0 && <div className="item-empty">조건에 맞는 품목이 없습니다.</div>}</div><footer className="item-pagination"><span>페이지당 <select disabled><option>10개</option></select></span><div><button disabled={page === 0} aria-label="이전 페이지" onClick={() => setPage((value) => Math.max(0, value - 1))}><ChevronLeft /></button><b>{page + 1}</b><span>/ {pageCount}</span><button disabled={page + 1 >= pageCount} aria-label="다음 페이지" onClick={() => setPage((value) => value + 1)}><ChevronRight /></button></div><small>총 {demo ? '128' : filtered.length}건</small></footer></section>
+      {selected && <aside className="item-side"><section className="panel item-detail"><header><h2>품목 상세 정보</h2><button className="item-edit-button" onClick={() => setModal({ initial: selected })}>✎ 수정</button></header><div className="item-profile"><span><Box /></span><div><b>{selected.name}</b><em className={selected.status === '사용중' ? 'active' : ''}>{selected.status}</em><small>{selectedDetails.length ? selectedDetails.map((line, index) => <React.Fragment key={`${index}-${line}`}>{index > 0 && <br />}{line}</React.Fragment>) : '세부 사항 미기재'}</small></div></div><dl><div><dt>품목 분류</dt><dd>{selected.category}</dd><dt>최초 등록일</dt><dd>{fmtDate(selected.createdDate)}</dd></div><div><dt>단위</dt><dd>{selected.unit}</dd><dt>최근 수정일</dt><dd>{fmtDate(selected.updatedDate || selected.recentDate)}</dd></div><div><dt>세부 사항</dt><dd>{selectedDetails.length ? selectedDetails.map((line, index) => <React.Fragment key={`${index}-${line}`}>{index > 0 && <br />}{line}</React.Fragment>) : '—'}</dd><dt>거래처 수</dt><dd>{selected.customers}개</dd></div><div><dt>설명</dt><dd>{selected.description || '등록된 설명이 없습니다.'}</dd><dt>등록자</dt><dd>{selected.registeredBy || '—'}</dd></div></dl><section className="item-history"><header><h3>최근 단가 이력</h3><button onClick={() => onNotify?.('단가 비교 화면에서 품목 이력을 더 자세히 볼 수 있습니다.')}>전체보기 <ChevronRight /></button></header><div className="item-history-scroll"><table><thead><tr><th>작성일</th><th>거래처</th><th>단가(원)</th><th>수량</th><th>견적번호</th></tr></thead><tbody>{visibleHistory.slice(0, 5).map((row, index) => <tr key={`${row.quote}-${index}`}><td>{fmtDate(row.date)}</td><td>{row.customer}</td><td>{fmtPrice(row.price)}</td><td>{row.quantity ?? '—'}</td><td>{row.quoteId && !demo ? <button type="button" className="item-quote-link" onClick={() => onOpenQuote?.(row.quoteId, row.quote)}>{row.quote}</button> : row.quote}</td></tr>)}</tbody></table>{!visibleHistory.length && <div className="item-history-empty">이 품목의 견적 단가 이력이 없습니다.</div>}</div></section></section></aside>}</div>
     {demo && <p className="item-demo-caption">시안 예시 데이터 · 실제 품목 정보가 아닙니다.</p>}
     {modal && <ItemForm initial={modal.initial} onClose={() => setModal(null)} onSave={saveItem} />}
   </section>;

@@ -126,7 +126,18 @@ class Database:
                 with self.engine.begin() as connection:
                     connection.execute(text("ALTER TABLE quote_chats ADD COLUMN model VARCHAR(200)"))
         from sqlalchemy import select
+        from .repository import detail
         with self.sessions.begin() as session:
+            # Older records may have only subtotal populated. Normalize once so
+            # quote totals, search, exports, and summaries all use total_amount.
+            for quote in session.scalars(select(Quote)):
+                payload = quote.payload or {}
+                if payload.get("total_amount") is None and payload.get("subtotal") is not None:
+                    normalized = {**payload, "total_amount": payload["subtotal"], "subtotal": None}
+                    quote.payload = normalized
+                    quote.updated_at = now()
+                    session.flush()
+                    session.add(Revision(quote_id=quote.id, version=quote.version, action="subtotal_moved_to_total", snapshot=detail(quote)))
             for chat in session.scalars(select(QuoteChat).where(QuoteChat.pending_request_id.is_not(None))):
                 chat.pending_request_id, chat.updated_at = None, now()
             for job in session.scalars(select(Job).where(Job.status.in_(["queued", "running"]))):

@@ -214,7 +214,7 @@ def item_history(request: Request, keyword: str | None = Query(None, min_length=
         for q in session.scalars(select(Quote).where(Quote.deleted_at.is_(None)).order_by(Quote.created_at.desc())):
             for item in q.items:
                 if not keyword or normalized(keyword) in normalized(item.item_name):
-                    rows.append({**item.payload, "quote_id": q.id, "item_id": item.id, "line_number": item.line_number, **{k: q.payload.get(k) for k in ("customer_name", "issue_date", "payment_terms", "delivery_terms", "discount_terms", "tax_rate")}, "currency": item.payload.get("currency") or q.payload.get("currency"), "status": q.status, "kind": q.kind})
+                    rows.append({**item.payload, "quote_id": q.id, "quote_number": q.payload.get("quote_number"), "item_id": item.id, "line_number": item.line_number, **{k: q.payload.get(k) for k in ("customer_name", "issue_date", "payment_terms", "delivery_terms", "discount_terms", "tax_rate")}, "currency": item.payload.get("currency") or q.payload.get("currency"), "status": q.status, "kind": q.kind})
         return {"items": rows[offset:offset+limit], "total": len(rows), "limit": limit, "offset": offset}
 
 

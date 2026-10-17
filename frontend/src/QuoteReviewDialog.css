@@ -9,6 +9,7 @@
 .quote-review-dialog svg{width:18px;height:18px;flex-shrink:0}
 .quote-review-body{padding:24px 28px;display:grid;gap:24px}
 .quote-review-summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.quote-direction-control{display:flex;align-items:center;gap:8px;margin-left:auto;color:#536983;font-size:12px;white-space:nowrap}.quote-review-summary .quote-direction-control+.secondary-button{margin-left:0}.quote-direction-control select{min-width:145px;min-height:38px;padding:7px 10px;border:1px solid #dce3ed;border-radius:7px;background:#fff;color:#263a56;font:inherit;font-size:12px}.quote-direction-control select:disabled{background:#f7f9fc;color:#75849a}
 .quote-review-dialog .secondary-button,.quote-review-dialog .primary-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 14px;font-size:13px}
 .quote-review-dialog fieldset{margin:0;padding:18px;border:1px solid #e1e7ef;border-radius:10px;min-width:0}
 .quote-review-dialog legend{padding:0 7px;font-size:15px;font-weight:700}.quote-review-dialog legend small{font-weight:400;font-size:11px;color:#75849a}
