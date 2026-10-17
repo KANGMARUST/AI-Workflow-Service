@@ -38,10 +38,8 @@ class Service:
             raise HTTPException(422, str(exc)) from exc
         digest = hashlib.sha256(data).hexdigest()
         with self.db.sessions() as session:
-            old = session.scalar(select(Quote).where(Quote.source_hash == digest))
+            old = session.scalar(select(Quote).where(Quote.source_hash == digest, Quote.deleted_at.is_(None)))
             if old:
-                if old.deleted_at:
-                    raise HTTPException(409, "휴지통에 같은 원본이 있습니다. 먼저 복원하세요.")
                 return {**detail(old), "duplicate": True}
         path = self.files / (digest + suffix)
         temporary = self.files / (uid() + ".tmp")
@@ -49,6 +47,10 @@ class Service:
             temporary.write_bytes(data)
             os.replace(temporary, path)
             with self.db.sessions.begin() as session:
+                trashed = session.scalars(select(Quote).where(Quote.source_hash == digest, Quote.deleted_at.is_not(None))).all()
+                for old in trashed:
+                    old.source_hash = None
+                session.flush()
                 quote = Quote(id=uid(), source_filename=filename, source_storage_path=path.name, source_hash=digest)
                 set_fields(quote, QuoteFields().model_dump(mode="json"))
                 session.add(quote)
@@ -58,8 +60,8 @@ class Service:
         except IntegrityError:
             # Another request may have registered the exact same content concurrently.
             with self.db.sessions() as session:
-                old = session.scalar(select(Quote).where(Quote.source_hash == digest))
-                if old and not old.deleted_at:
+                old = session.scalar(select(Quote).where(Quote.source_hash == digest, Quote.deleted_at.is_(None)))
+                if old:
                     return {**detail(old), "duplicate": True}
             raise HTTPException(409, "같은 원본 등록이 충돌했습니다. 다시 조회하세요.")
         finally:

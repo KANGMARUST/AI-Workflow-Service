@@ -1,8 +1,10 @@
+import hashlib
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 
 from .database import Job, Quote, Revision, now
 from .documents import quote_pdf, quote_xlsx
@@ -146,7 +148,7 @@ def trash_quote(request: Request, quote_id: str):
     with svc(request).db.sessions.begin() as session:
         q = require(session, quote_id)
         ensure_idle(q)
-        q.deleted_at, q.updated_at = now(), now()
+        q.deleted_at, q.source_hash, q.updated_at = now(), None, now()
         record(session, q, "trash")
         return {"quote_id": q.id, "deleted": True, "recoverable": True}
 
@@ -157,14 +159,46 @@ def trash_list(request: Request, limit: int = Query(20, ge=1, le=100), offset: i
         return search(session, QuoteSearchRequest(limit=limit, offset=offset), trash=True)
 
 
+@router.delete("/trash/{quote_id}", summary="휴지통 견적 영구 삭제")
+def purge_quote(request: Request, quote_id: str):
+    service = svc(request)
+    with service.db.sessions.begin() as session:
+        q = require(session, quote_id, deleted=True)
+        if not q.deleted_at:
+            raise HTTPException(409, "휴지통에 있는 견적만 영구 삭제할 수 있습니다.")
+        linked = session.scalar(select(Quote.id).where(Quote.source_quote_id == quote_id).limit(1))
+        if linked:
+            raise HTTPException(409, "이 원본을 참조하는 견적이 있어 영구 삭제할 수 없습니다.")
+        source_name = q.source_storage_path
+        session.execute(delete(Job).where(Job.quote_id == quote_id))
+        session.execute(delete(Revision).where(Revision.quote_id == quote_id))
+        session.delete(q)
+    if source_name:
+        with service.db.sessions() as session:
+            referenced = session.scalar(select(Quote.id).where(Quote.source_storage_path == source_name).limit(1))
+        if not referenced:
+            path = (service.files / source_name).resolve()
+            if path.parent == service.files.resolve():
+                path.unlink(missing_ok=True)
+    return {"quote_id": quote_id, "deleted": True, "permanent": True}
+
+
 @router.post("/quotes/{quote_id}/restore", summary="견적서 복원")
 def restore(request: Request, quote_id: str):
-    with svc(request).db.sessions.begin() as session:
-        q = require(session, quote_id, deleted=True)
-        if q.deleted_at:
-            q.deleted_at, q.updated_at = None, now()
-            record(session, q, "restore")
-        return detail(q)
+    service = svc(request)
+    try:
+        with service.db.sessions.begin() as session:
+            q = require(session, quote_id, deleted=True)
+            if q.deleted_at:
+                digest = hashlib.sha256(service.source(q).read_bytes()).hexdigest()
+                existing = session.scalar(select(Quote).where(Quote.source_hash == digest, Quote.deleted_at.is_(None)))
+                if existing:
+                    raise HTTPException(409, "같은 원본의 활성 견적이 있습니다. 복원하려면 먼저 해당 견적을 휴지통으로 이동하세요.")
+                q.deleted_at, q.source_hash, q.updated_at = None, digest, now()
+                record(session, q, "restore")
+            return detail(q)
+    except IntegrityError as exc:
+        raise HTTPException(409, "같은 원본의 활성 견적이 있습니다. 다시 조회하세요.") from exc
 
 
 @router.get("/items/history", summary="품목 단가 이력")

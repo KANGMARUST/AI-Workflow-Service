@@ -91,7 +91,7 @@ const job = await fetch(`${API}/api/extraction-jobs`, {
 
 `API`는 예를 들어 `http://127.0.0.1:8000`. 토큰이 없으면 `authHeaders={}`, 있으면 `{Authorization:"Bearer ..."}`. multipart 요청의 Content-Type은 브라우저가 boundary와 함께 설정하도록 직접 지정하지 않는다.
 
-업로드 중복이면 기존 견적을 반환한다. 휴지통의 중복은 HTTP 409이며 복원해야 한다. 재추출은 기존 검토값을 바꾸므로 `{force:true}`를 명시한다. 추출 중에는 해당 견적의 수정·상태 변경·삭제가 HTTP 409다. GET `/api/extract?quote_id=...`는 조회만 하며 외부 호출을 시작하지 않는다.
+활성 견적과 업로드 원본이 중복이면 기존 견적을 반환한다. 같은 원본이 휴지통에만 있으면 새 견적으로 등록된다. 복원할 때 같은 원본의 활성 견적이 있으면 HTTP 409다. 재추출은 기존 검토값을 바꾸므로 `{force:true}`를 명시한다. 추출 중에는 해당 견적의 수정·상태 변경·삭제가 HTTP 409다. GET `/api/extract?quote_id=...`는 조회만 하며 외부 호출을 시작하지 않는다.
 
 ### 상세·수정·상태
 
@@ -150,7 +150,8 @@ POST `/api/agent-runs`:
 
 - DELETE `/api/quotes/{id}`: 복원 가능한 휴지통 이동. 원본·품목·이력은 보존.
 - GET `/api/trash`: 휴지통 목록.
-- POST `/api/quotes/{id}/restore`: 복원. 영구 삭제 API는 제공하지 않음.
+- POST `/api/quotes/{id}/restore`: 복원. 같은 원본의 활성 견적이 있으면 409.
+- DELETE `/api/trash/{id}`: 휴지통 견적의 DB 기록·작업·수정 이력을 영구 삭제. 원본 파일은 다른 견적이 참조하지 않을 때 삭제.
 - HTTP 400: 빈 파일/잘못된 파일명, 401: 인증, 404: 없는 ID/원본, 409: 중복·작업 중·버전 충돌, 413: 파일 크기, 422: 입력/파일/계산 형식 오류, 503: 저장소/필수 외부 설정 오류.
 - 작업을 받은 뒤 발생한 외부 오류는 작업의 `status=failed`, `error`에 표시한다. 외부 응답 본문과 키는 전달하지 않는다.
 

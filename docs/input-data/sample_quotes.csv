@@ -1,4 +1,0 @@
-quote_number,issuer_company,customer_name,contact_name,issue_date,valid_until,title,item_name,specification,unit,quantity,unit_price,amount,currency,status,source_filename
-QT-SAMPLE-001,샘플제조사,가온테크,담당자A,2026-09-02,2026-09-30,센서 모듈 공급 견적,산업용 센서 모듈,IP67 / 24V,EA,20,320000,6400000,KRW,review_required,sample_sensor_quote.pdf
-QT-SAMPLE-001,샘플제조사,가온테크,담당자A,2026-09-02,2026-09-30,센서 모듈 공급 견적,연결 케이블,2m / 차폐형,EA,20,32000,640000,KRW,review_required,sample_sensor_quote.pdf
-QT-SAMPLE-002,샘플제조사,누리시스템,담당자B,2026-09-08,2026-10-08,자동화 부품 견적,제어 릴레이,24V DC,EA,50,18500,925000,KRW,confirmed,sample_automation_quote.xlsx

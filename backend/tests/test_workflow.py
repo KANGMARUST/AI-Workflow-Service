@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 from pathlib import Path
 
@@ -91,17 +92,43 @@ def test_zero_is_not_missing(client):
     assert q["items"][0]["quantity"] == "0" and q["items"][0]["amount"] == "0"
 
 
-def test_duplicate_trash_restore_source(client):
+def test_duplicate_trash_restore_source(client, app):
     original_bytes = xlsx()
     q = upload(client, original_bytes)
     assert upload(client, original_bytes)["duplicate"] is True
     assert client.delete("/api/quotes/"+q["quote_id"]).json()["recoverable"]
     assert client.get("/api/cards").json()["total"] == 0
     assert client.get(f"/api/quotes/{q['quote_id']}/source").status_code == 404
-    assert client.post("/api/add", files={"file": ("same.xlsx", original_bytes)}).status_code == 409
+    replacement = upload(client, original_bytes, "same.xlsx")
+    assert replacement["quote_id"] != q["quote_id"] and replacement["duplicate"] is False
+    assert upload(client, original_bytes, "same.xlsx")["quote_id"] == replacement["quote_id"]
+    extract(client, replacement["quote_id"])
+    job_id = client.get(f"/api/quotes/{replacement['quote_id']}/jobs").json()["items"][0]["job_id"]
     assert client.get("/api/trash").json()["total"] == 1
+    assert client.post(f"/api/quotes/{q['quote_id']}/restore").status_code == 409
+    assert client.delete("/api/quotes/"+replacement["quote_id"]).status_code == 200
     assert client.post(f"/api/quotes/{q['quote_id']}/restore").status_code == 200
     assert client.get(f"/api/quotes/{q['quote_id']}/source").content == original_bytes
+    assert client.delete(f"/api/trash/{q['quote_id']}").status_code == 409
+    assert client.delete(f"/api/trash/{replacement['quote_id']}").json()["permanent"] is True
+    assert client.get(f"/api/quotes/{replacement['quote_id']}").status_code == 404
+    assert client.get(f"/api/jobs/{job_id}").status_code == 404
+    assert client.get(f"/api/quotes/{q['quote_id']}/source").content == original_bytes
+    assert client.delete("/api/quotes/"+q["quote_id"]).status_code == 200
+    assert client.delete(f"/api/trash/{q['quote_id']}").status_code == 200
+    assert client.get("/api/trash").json()["total"] == 0
+    assert not list(app.state.service.files.iterdir())
+
+
+def test_legacy_trashed_hash_allows_new_upload(client, app):
+    original_bytes = xlsx()
+    old = upload(client, original_bytes)
+    assert client.delete(f"/api/quotes/{old['quote_id']}").status_code == 200
+    with app.state.db.sessions.begin() as session:
+        session.get(Quote, old["quote_id"]).source_hash = hashlib.sha256(original_bytes).hexdigest()
+    new = upload(client, original_bytes)
+    assert new["quote_id"] != old["quote_id"] and new["duplicate"] is False
+    assert client.get("/api/trash").json()["total"] == 1
 
 
 @pytest.mark.parametrize("filename,data,status", [("../bad.xlsx", b"data", 400), ("bad.xls", b"data", 422), ("bad.pdf", b"not pdf", 422), ("bad.xlsx", b"PK fake", 422), ("empty.pdf", b"", 400)])

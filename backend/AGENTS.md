@@ -71,7 +71,7 @@ docker compose -f backend/docker-compose.yml up --build
 - 목록 응답은 `items`, `total`, `limit`, `offset`을 유지한다. 현재 페이지 크기는 기본 20, 최대 100이고 `offset`은 0 이상이다.
 - 상태 값은 `review_required`, `extracting`, `confirmed`, `rejected`, `archived`다. extracting은 작업 API만 설정하고 추출 중 수정·상태 변경·삭제는 충돌로 처리한다. 그 외 추가 상태 전이 제한은 없다.
 - 추출 시작은 부작용이 있으므로 구현 시 `POST /api/extract` 또는 `POST /api/extraction-jobs`를 검토한다. 기존 GET 계약을 임의로 제거하거나 처리 시작 용도로 바꾸지 않는다.
-- 상세·원본·중복 검사·복원 가능한 휴지통·공유 Bearer 토큰은 구현됐다. 조직별 로그인·행별 권한·영구 삭제는 구현하지 않았다. 현재 범위와 확장 기능을 구분한다.
+- 상세·원본·중복 검사·복원 가능한 휴지통·휴지통 항목별 영구 삭제·공유 Bearer 토큰은 구현됐다. 조직별 로그인·행별 권한은 구현하지 않았다. 현재 범위와 확장 기능을 구분한다.
 - API 경로·필드·타입·상태 값 변경 시 프론트엔드 영향과 호환성을 확인하고 필요한 계약 문서 변경을 함께 제시한다.
 
 ## 데이터와 구현 원칙
