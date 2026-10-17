@@ -11,6 +11,7 @@ from .database import Job, Quote, now, uid
 from .documents import DocumentError, agent_input, local_extract, make_pdf, read_document, validate_file
 from .domain import compare_quotes, parse_json_field
 from .extraction import normalize_result
+from .ocr import OCRClient
 from .quote_layout import apply_document_rows
 from .repository import detail, ensure_idle, record, require, set_fields
 from .schemas import QuoteFields
@@ -23,6 +24,7 @@ class Service:
         self.files = config.data_dir / "files"
         self.files.mkdir(parents=True, exist_ok=True)
         self.agent = UpstageClient(config)
+        self.ocr = OCRClient(config)
 
     def upload(self, data, filename, direction=None):
         if not filename or any(x in filename for x in ("/", "\\")) or any(ord(x) < 32 or ord(x) == 127 for x in filename) or len(filename) > 240:
@@ -124,10 +126,13 @@ class Service:
                 q.extraction_status = "running"
                 content = self.source(q).read_bytes()
                 suffix, provider = Path(q.source_filename).suffix.lower(), job.provider
-            document = read_document(content, suffix, self.config.max_document_pages)
+            document = read_document(content, suffix, self.config.max_document_pages, ocr=self.ocr)
             remote = {}
             if provider == "upstage":
-                pdf = content if suffix == ".pdf" else make_pdf(f"견적서 {suffix[1:].upper()} 셀·표 원문", document["text"].splitlines(), self.config.pdf_font_path)
+                pdf = content
+                if suffix != ".pdf" or document["ocr"]["applied"]:
+                    title = "견적서 추출 원문 (OCR 적용)" if document["ocr"]["applied"] else f"견적서 {suffix[1:].upper()} 셀·표 원문"
+                    pdf = make_pdf(title, document["text"].splitlines(), self.config.pdf_font_path)
                 remote = self.agent.run(pdf, self.config.quote_extract_agent_id, self.config.quote_extract_config_id)
                 extracted = remote["data"]
             else:
@@ -149,7 +154,7 @@ class Service:
                 q = require(session, job.quote_id)
                 fields["direction"] = q.payload.get("direction")
                 set_fields(q, fields)
-                q.extraction_raw = {"provider": provider, "text": document["text"], "fields": extracted, "agent_fields": agent_fields, "warnings": warnings,
+                q.extraction_raw = {"provider": provider, "text": document["text"], "ocr": document["ocr"], "fields": extracted, "agent_fields": agent_fields, "warnings": warnings,
                                     **{k: v for k, v in remote.items() if k != "data"}}
                 q.status, q.extraction_status = "review_required", "completed"
                 record(session, q, "extraction_completed")

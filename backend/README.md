@@ -47,6 +47,8 @@ docker compose -f backend/docker-compose.yml up --build
 | `QUOTE_EXTRACT_AGENT_ID`, `QUOTE_EXTRACT_CONFIG_ID` | 추출 에이전트·설정 버전 |
 | `QUOTE_COMPARE_AGENT_ID`, `QUOTE_COMPARE_CONFIG_ID` | 비교 에이전트·설정 버전 |
 | `AGENT_TIMEOUT_SECONDS` | 외부 작업 제한 시간. 기본 180초 |
+| `OCR_ENABLED` | 스캔 PDF OCR 활성화. 기본 true. 기존 `UPSTAGE_API_KEY` 사용 |
+| `OCR_BASE_URL`, `OCR_TIMEOUT_SECONDS` | OCR 주소(기본 https://api.upstage.ai/v1), 페이지당 제한 시간(기본 120초) |
 | `CORS_ORIGINS` | 쉼표로 구분한 프론트 주소. 기본 localhost/127.0.0.1:5173 |
 | `API_TOKEN` | 선택적 공유 Bearer 토큰. `APP_ENV=production`에서는 필수 |
 | `MAX_UPLOAD_MB`, `MAX_DOCUMENT_PAGES` | 기본 20MB, 100페이지 |
@@ -190,7 +192,7 @@ backend/.venv/Scripts/python.exe -u backend/tools/live_agent_check.py --live --a
 backend/.venv/Scripts/python.exe -u backend/tools/live_agent_check.py --live --api --xlsx
 ```
 
-Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증이다. 로컬 파서는 명시된 라벨과 품목 표를 처리하는 보조 기능이며 자유 양식의 의미 추출은 Studio 및 담당자 검토가 필요하다. 스캔/OCR·Word·기업별 양식·수주/매출 데이터·조직별 로그인은 확장 범위다.
+Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증이다. 로컬 파서는 명시된 라벨과 품목 표를 처리하는 보조 기능이며 자유 양식의 의미 추출은 Studio 및 담당자 검토가 필요하다. Word·기업별 양식·수주/매출 데이터·조직별 로그인은 확장 범위다.
 
 ## 견적서 기반 대화
 
@@ -214,7 +216,7 @@ Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증
 
 ## 지정 입력 문서 지원
 
-입력은 `.xls`, `.xlsx`, 텍스트 PDF다. 지정된 `docs/input-data/`의 견적 3개에 대한 처리 방식, 선택 옵션·상위/구성품 관계와 검증 결과는 [입력 문서 지원 안내](INPUT_DOCUMENTS.md)에 정리했다. `sample_quotes.csv`, README 및 `~$` 임시 파일은 이 검사 대상에서 제외한다.
+입력은 `.xls`, `.xlsx`, 텍스트 PDF와 스캔 PDF다. 스캔 PDF는 [OCR 처리 계약](OCR_API.md)에 따라 OCR 후 에이전트에 전달한다. 지정된 `docs/input-data/`의 견적 3개에 대한 처리 방식, 선택 옵션·상위/구성품 관계와 검증 결과는 [입력 문서 지원 안내](INPUT_DOCUMENTS.md)에 정리했다. `sample_quotes.csv`, README 및 `~$` 임시 파일은 이 검사 대상에서 제외한다.
 
 ```powershell
 # 로컬 읽기만 검사: 외부 호출 없음

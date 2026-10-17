@@ -67,6 +67,8 @@ print("Health and OpenAPI OK")
 
 ## Codex 작업 방식
 
+스캔 PDF OCR 설정·실호출 점검 명령은 `OCR_API.md`를 따른다. `pypdf` 의존성 설치 후 서버를 재시작한다. `tests/test_ocr.py`는 외부 호출 없이 OCR 선처리·혼합 페이지·오류·원본 보존을 확인한다.
+
 - 작업 지침: `AGENTS.md`
 - Python 실행 파일: `backend/.venv/Scripts/python.exe`
 - 작업 시작 시 변경 상태를 확인하고 요청에 필요한 파일만 수정한다.
