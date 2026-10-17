@@ -192,6 +192,14 @@ backend/.venv/Scripts/python.exe -u backend/tools/live_agent_check.py --live --a
 
 Supabase 실DB·Docker 실행, 다양한 기업 실문서 정확도는 미검증이다. 로컬 파서는 명시된 라벨과 품목 표를 처리하는 보조 기능이며 자유 양식의 의미 추출은 Studio 및 담당자 검토가 필요하다. 스캔/OCR·Word·기업별 양식·수주/매출 데이터·조직별 로그인은 확장 범위다.
 
+## 견적서 기반 대화
+
+`POST /api/chats`로 견적서 1~5개를 선택한 뒤 `POST /api/chats/{chat_id}/messages`에 질문과 `expected_version`을 보낸다. 이전 질문·답변과 견적 근거를 DB에 보존하고 후속 질문을 이어갈 수 있다. 기존 Upstage 키를 사용하며 기본 모델은 Solar Pro 4다.
+
+요청·응답 예제, 문맥 한도, 근거 필드, 삭제 동작과 PostgreSQL 추가 migration은 [대화 API 계약](CHAT_API.md)을 따른다. 프론트엔드 파일은 이 기능 구현 범위에 포함하지 않는다.
+
+사용자 모델 선택은 `GET /api/chats/models`와 `PATCH /api/chats/{chat_id}`를 사용한다. 기본 선택지는 Solar Pro 4·Solar Mini 4다. 답변별 토큰은 `metadata.usage`, 대화 누적은 `GET /api/chats/{chat_id}/usage`, 저장된 전체 답변 누적은 `GET /api/chats/usage`로 조회한다. 모델 변경 후에도 대화 이력과 이전 사용량은 유지한다.
+
 ## 코드 위치
 
 - `app/routes.py`: API, `schemas.py`: 요청·응답 계약

@@ -12,6 +12,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.exc import StaleDataError
 
 from .config import Settings, settings
+from .chat import ChatService
+from .chat_routes import router as chat_router
 from .database import Database
 from .routes import router
 from .service import Service
@@ -35,6 +37,7 @@ def create_app(config: Settings | None = None):
         db = Database(config)
         db.initialize()
         app.state.db, app.state.service = db, Service(config, db)
+        app.state.chat = ChatService(config, db)
         try:
             yield
         finally:
@@ -44,6 +47,7 @@ def create_app(config: Settings | None = None):
     app.state.config = config
     app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in config.cors_origins.split(",") if x.strip()], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     app.include_router(router, prefix=config.api_prefix, dependencies=[Depends(authorize)])
+    app.include_router(chat_router, prefix=config.api_prefix, dependencies=[Depends(authorize)])
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):

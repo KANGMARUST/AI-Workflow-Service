@@ -26,6 +26,20 @@ CREATE INDEX ix_quotes_deleted_at ON quotes (deleted_at);
 
 CREATE INDEX ix_quotes_status ON quotes (status);
 
+CREATE TABLE quote_chats (
+	id VARCHAR(36) NOT NULL,
+	title VARCHAR(200) NOT NULL,
+	model VARCHAR(200),
+	quote_ids JSON NOT NULL,
+	version INTEGER NOT NULL,
+	pending_request_id VARCHAR(36),
+	created_at VARCHAR(40) NOT NULL,
+	updated_at VARCHAR(40) NOT NULL,
+	PRIMARY KEY (id)
+);
+
+CREATE INDEX ix_quote_chats_updated_at ON quote_chats (updated_at);
+
 CREATE TABLE quote_items (
 	id VARCHAR(36) NOT NULL,
 	quote_id VARCHAR(36) NOT NULL,
@@ -66,12 +80,30 @@ CREATE TABLE agent_jobs (
 	FOREIGN KEY(quote_id) REFERENCES quotes (id)
 );
 
-CREATE INDEX ix_agent_jobs_status ON agent_jobs (status);
-
 CREATE INDEX ix_agent_jobs_quote_id ON agent_jobs (quote_id);
 
+CREATE INDEX ix_agent_jobs_status ON agent_jobs (status);
+
+CREATE TABLE quote_chat_messages (
+	id VARCHAR(36) NOT NULL,
+	chat_id VARCHAR(36) NOT NULL,
+	sequence INTEGER NOT NULL,
+	role VARCHAR(20) NOT NULL,
+	content TEXT NOT NULL,
+	sources JSON NOT NULL,
+	metadata_json JSON NOT NULL,
+	created_at VARCHAR(40) NOT NULL,
+	PRIMARY KEY (id),
+	UNIQUE (chat_id, sequence),
+	FOREIGN KEY(chat_id) REFERENCES quote_chats (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_quote_chat_messages_chat_id ON quote_chat_messages (chat_id);
+
 -- No anonymous policies. The server connects with its trusted DB role.
+ALTER TABLE quote_chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quote_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quote_revisions ENABLE ROW LEVEL SECURITY;

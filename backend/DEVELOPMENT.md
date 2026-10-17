@@ -63,7 +63,7 @@ print("Health and OpenAPI OK")
 '@ | .\.venv\Scripts\python.exe -
 ```
 
-자동 테스트 50개는 `.\.venv\Scripts\python.exe -m pytest tests -q --basetemp=.runtime/pytest`로 실행한다. 별도 임시 DB·파일 경로를 사용하며 실제 Upstage API는 호출하지 않는다. 외부 API 실검증은 `README.md`의 명시적인 `tools/live_agent_check.py --live` 절차를 따른다.
+자동 테스트는 `.\.venv\Scripts\python.exe -m pytest tests -q --basetemp=.runtime/pytest`로 실행한다. 별도 임시 DB·파일 경로를 사용하며 실제 Upstage API는 호출하지 않는다. 견적 대화 테스트는 `tests/test_chat.py`, 실제 Solar 대화 확인은 `tools/live_chat_check.py --live`를 사용한다. 상세 계약과 외부 PostgreSQL 추가 migration은 `CHAT_API.md`를 따른다. 추출·비교 에이전트 실검증은 `README.md`의 명시적인 `tools/live_agent_check.py --live` 절차를 따른다.
 
 ## Codex 작업 방식
 

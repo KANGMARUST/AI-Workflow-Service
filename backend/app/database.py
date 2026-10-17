@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import JSON, ForeignKey, Integer, String, Text, create_engine, event
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 from .config import Settings
@@ -72,6 +72,33 @@ class Job(Base):
     updated_at: Mapped[str] = mapped_column(String(40), default=now)
 
 
+class QuoteChat(Base):
+    __tablename__ = "quote_chats"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    title: Mapped[str] = mapped_column(String(200))
+    model: Mapped[str | None] = mapped_column(String(200))
+    quote_ids: Mapped[list] = mapped_column(JSON)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    pending_request_id: Mapped[str | None] = mapped_column(String(36))
+    created_at: Mapped[str] = mapped_column(String(40), default=now)
+    updated_at: Mapped[str] = mapped_column(String(40), default=now, index=True)
+    messages: Mapped[list["ChatMessage"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+    __mapper_args__ = {"version_id_col": version}
+
+
+class ChatMessage(Base):
+    __tablename__ = "quote_chat_messages"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    chat_id: Mapped[str] = mapped_column(ForeignKey("quote_chats.id", ondelete="CASCADE"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list] = mapped_column(JSON, default=list)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[str] = mapped_column(String(40), default=now)
+    __table_args__ = (UniqueConstraint("chat_id", "sequence"),)
+
+
 class Database:
     def __init__(self, config: Settings):
         config.data_dir.mkdir(parents=True, exist_ok=True)
@@ -93,8 +120,15 @@ class Database:
     def initialize(self):
         if self.create_schema:
             Base.metadata.create_all(self.engine)
+        if self.engine.dialect.name == "sqlite":
+            columns = {column["name"] for column in inspect(self.engine).get_columns("quote_chats")}
+            if "model" not in columns:
+                with self.engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE quote_chats ADD COLUMN model VARCHAR(200)"))
         from sqlalchemy import select
         with self.sessions.begin() as session:
+            for chat in session.scalars(select(QuoteChat).where(QuoteChat.pending_request_id.is_not(None))):
+                chat.pending_request_id, chat.updated_at = None, now()
             for job in session.scalars(select(Job).where(Job.status.in_(["queued", "running"]))):
                 job.status, job.error, job.updated_at = "failed", "서버가 재시작되어 작업이 중단되었습니다. 다시 실행하세요.", now()
                 if job.kind == "extract" and job.quote_id:

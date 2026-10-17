@@ -7,6 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
 from .database import Job, Quote, Revision, now
+from .chat import purge_quote_chats
 from .documents import quote_pdf, quote_xlsx
 from .domain import compare_quotes
 from .repository import check_version, clean_fields, detail, ensure_idle, record, require, search, set_fields
@@ -173,6 +174,7 @@ def purge_quote(request: Request, quote_id: str):
         if linked:
             raise HTTPException(409, "이 원본을 참조하는 견적이 있어 영구 삭제할 수 없습니다.")
         source_name = q.source_storage_path
+        purge_quote_chats(session, quote_id)
         session.execute(delete(Job).where(Job.quote_id == quote_id))
         session.execute(delete(Revision).where(Revision.quote_id == quote_id))
         session.delete(q)
@@ -257,4 +259,10 @@ def stats(request: Request):
 @router.get("/capabilities", summary="프론트 연결용 지원 기능·설정 상태")
 def capabilities(request: Request):
     config = svc(request).config
-    return {"supported_extensions": [".xls", ".xlsx", ".pdf"], "max_upload_mb": config.max_upload_mb, "max_document_pages": config.max_document_pages, "upstage_configured": bool(config.upstage_api_key.get_secret_value()) and not config.upstage_api_key.get_secret_value().startswith("replace-"), "database": svc(request).db.engine.dialect.name, "statuses": [s.value for s in QuoteStatus], "authentication_required": bool(config.api_token.get_secret_value())}
+    configured = bool(config.upstage_api_key.get_secret_value()) and not config.upstage_api_key.get_secret_value().startswith("replace-")
+    return {"supported_extensions": [".xls", ".xlsx", ".pdf"], "max_upload_mb": config.max_upload_mb,
+            "max_document_pages": config.max_document_pages, "upstage_configured": configured,
+            "database": svc(request).db.engine.dialect.name, "statuses": [s.value for s in QuoteStatus],
+            "authentication_required": bool(config.api_token.get_secret_value()),
+            "chat": {"configured": configured, "model": config.chat_model, "models": config.available_chat_models,
+                     "max_quotes": 5, "streaming": False}}

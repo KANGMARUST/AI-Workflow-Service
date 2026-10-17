@@ -30,6 +30,8 @@ QuoteFlow는 견적서에서 거래처·담당자·연락처·품목·금액·�
 | `app/config.py` | 환경변수와 설정 로딩 |
 | `app/database.py`, `app/repository.py` | DB 모델, 원자적 저장, 버전·이력 |
 | `app/service.py`, `app/upstage.py` | 백그라운드 작업과 Studio API |
+| `app/chat.py`, `app/chat_client.py`, `app/chat_routes.py`, `app/chat_schemas.py` | 견적 기반 대화·Solar 호출·근거·이력 API |
+| `app/chat_usage.py` | 저장된 대화 답변의 입력·출력·전체 토큰 및 모델별 집계 |
 | `app/documents.py`, `app/extraction.py`, `app/domain.py` | 파일 처리·출력·정규화·금액 검사·비교 |
 | `supabase/schema.sql` | 빈 PostgreSQL용 초기 DDL. 이전 초안의 업그레이드 migration이 아님 |
 | `.env.example` | 환경변수 예시 |
