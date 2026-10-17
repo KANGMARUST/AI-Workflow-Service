@@ -35,7 +35,7 @@ def extraction_result(request: Request, quote_id: str = Query(...)):
     with svc(request).db.sessions() as session:
         q = require(session, quote_id)
         job = session.scalar(select(Job).where(Job.quote_id == q.id, Job.kind == "extract").order_by(Job.created_at.desc()).limit(1))
-        return {"quote_id": q.id, "extraction_status": q.extraction_status, "extracted_fields": clean_fields(q), "warnings": q.extraction_raw.get("warnings", []), "validation": detail(q)["validation"], "provider": q.extraction_raw.get("provider"), "source_text": q.extraction_raw.get("text"), "source_fields": q.extraction_raw.get("fields"), "latest_job": svc(request).job_data(job) if job else None}
+        return {"quote_id": q.id, "extraction_status": q.extraction_status, "extracted_fields": clean_fields(q), "warnings": q.extraction_raw.get("warnings", []), "validation": detail(q)["validation"], "provider": q.extraction_raw.get("provider"), "source_text": q.extraction_raw.get("text"), "source_fields": q.extraction_raw.get("fields"), "ocr": q.extraction_raw.get("ocr", {"applied": False, "pages": []}), "latest_job": svc(request).job_data(job) if job else None}
 
 
 @router.post("/extract", status_code=202, summary="추출 시작")
@@ -264,5 +264,7 @@ def capabilities(request: Request):
             "max_document_pages": config.max_document_pages, "upstage_configured": configured,
             "database": svc(request).db.engine.dialect.name, "statuses": [s.value for s in QuoteStatus],
             "authentication_required": bool(config.api_token.get_secret_value()),
+            "ocr": {"enabled": config.ocr_enabled, "configured": config.ocr_enabled and configured,
+                    "provider": "upstage", "mode": "scanned_pages"},
             "chat": {"configured": configured, "model": config.chat_model, "models": config.available_chat_models,
                      "max_quotes": 5, "streaming": False}}

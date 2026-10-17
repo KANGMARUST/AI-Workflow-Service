@@ -80,7 +80,7 @@ def validate_file(data: bytes, suffix: str, max_pages: int):
     elif suffix == ".xls":
         open_xls(data).release_resources()
     else:
-        raise DocumentError("현재 .xls, .xlsx와 텍스트 PDF만 지원합니다.")
+        raise DocumentError("현재 .xls, .xlsx와 PDF만 지원합니다.")
 
 
 def open_xls(data):
@@ -142,9 +142,9 @@ def read_xls(data):
     return tables, raw, warnings
 
 
-def read_document(data, suffix, max_pages=100):
+def read_document(data, suffix, max_pages=100, ocr=None):
     validate_file(data, suffix, max_pages)
-    warnings, tables, raw, page_texts = [], [], [], []
+    warnings, tables, raw, page_texts, ocr_pages = [], [], [], [], []
     if suffix == ".xls":
         tables, raw, warnings = read_xls(data)
     elif suffix == ".xlsx":
@@ -192,16 +192,37 @@ def read_document(data, suffix, max_pages=100):
     else:
         try:
             import pdfplumber
+            from .ocr import has_text
+            needs_ocr = []
             with pdfplumber.open(io.BytesIO(data)) as pdf:
                 for i, page in enumerate(pdf.pages):
                     page_text = page.extract_text() or ""
                     page_texts.append(page_text)
-                    raw.append(f"[페이지 {i+1}]\n" + page_text)
+                    # Full-page scans can have a small header/footer text layer.
+                    image_area = sum(max(0, image["x1"] - image["x0"]) * max(0, image["bottom"] - image["top"])
+                                     for image in page.images)
+                    if not has_text(page_text) or image_area >= page.width * page.height * 0.5:
+                        needs_ocr.append(i)
                     tables.extend(page.extract_tables() or [])
+            if needs_ocr:
+                if ocr is None:
+                    raise DocumentError("스캔 PDF의 OCR 처리가 필요합니다. OCR 설정과 Upstage API 키를 확인하세요.")
+                recognized = ocr.extract_pages(data, needs_ocr)
+                for index in needs_ocr:
+                    result = recognized[index]
+                    if has_text(result["text"]):
+                        page_texts[index] = result["text"]
+                    else:
+                        warnings.append(f"{index+1}페이지에서 OCR로 읽을 수 있는 텍스트를 찾지 못했습니다. 원본을 확인하세요.")
+                    ocr_pages.append({key: value for key, value in result.items() if key != "text"})
+                warnings.append("스캔 페이지에 OCR을 적용했습니다. 숫자·납기·유효기간은 원본과 대조하세요.")
+            raw.extend(f"[페이지 {i+1}]\n" + text for i, text in enumerate(page_texts))
         except ImportError:
             from pdfminer.high_level import extract_text
             raw.append(extract_text(io.BytesIO(data)))
             warnings.append("표 파서가 없어 텍스트만 읽었습니다. 품목은 직접 확인하세요.")
+        except DocumentError:
+            raise
         except Exception as exc:
             raise DocumentError("PDF 텍스트와 표를 추출하지 못했습니다.") from exc
     text = "\n\n".join(raw)
@@ -209,13 +230,14 @@ def read_document(data, suffix, max_pages=100):
         raise DocumentError("추출 텍스트가 300,000자를 초과합니다.")
     content_text = re.sub(r"\[(?:페이지 \d+|시트: [^\]]*|원본 수식: [^\]]*)\]", "", text)
     if not re.search(r"[가-힣A-Za-z0-9一-龥]", content_text):
-        message = "텍스트가 없는 스캔 PDF입니다. OCR 지원은 별도 확장 범위입니다." if suffix == ".pdf" else "표시 시트에 읽을 수 있는 셀 내용이 없습니다."
+        message = "PDF에서 읽을 수 있는 텍스트를 찾지 못했습니다. 스캔 품질과 원본을 확인하세요." if suffix == ".pdf" else "표시 시트에 읽을 수 있는 셀 내용이 없습니다."
         raise DocumentError(message)
     line_items = pdf_line_items(page_texts)
     if line_items:
         warnings.append("품목 수량·단가·금액은 명시된 PDF 텍스트 행으로 대조했습니다. 화면 표기와 텍스트 레이어가 다를 수 있으므로 원본을 확인하세요.")
     selection_required = bool(re.search(r"\d+번[^\n]*선택|선택\s*옵션|택\s*일", text))
-    document = {"text": text, "tables": tables, "warnings": sorted(set(warnings)), "line_items": line_items, "selection_required": selection_required}
+    document = {"text": text, "tables": tables, "warnings": sorted(set(warnings)), "line_items": line_items, "selection_required": selection_required,
+                "ocr": {"applied": bool(ocr_pages), "pages": ocr_pages}}
     if suffix == ".xls":
         candidates = local_extract(document)["items"]
         if candidates and all(all(re.fullmatch(r"\d+(?:\.\d+)?", str(row.get(k) or "").replace(",", "")) for k in ("quantity", "unit_price", "amount")) and row.get("unit") for row in candidates):

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     supabase_key: SecretStr = SecretStr("")
     upstage_api_key: SecretStr = SecretStr("")
     upstage_base_url: str = "https://api.upstage.ai/v2"
+    ocr_enabled: bool = True
+    ocr_base_url: str = "https://api.upstage.ai/v1"
+    ocr_timeout_seconds: float = Field(default=120, ge=1, le=900)
     chat_base_url: str = "https://api.upstage.ai/v1"
     chat_model: str = "solar-pro4"
     chat_allowed_models: str = "solar-pro4,solar-mini4"
